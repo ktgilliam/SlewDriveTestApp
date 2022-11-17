@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/home/kevin/Documents/debug_space/kinco_iface/build",
+  "command": "/usr/bin/g++ -I/usr/include/modbus -g -o CMakeFiles/terminal_iface.dir/TerminalInterface.cc.o -c /home/kevin/Documents/debug_space/kinco_iface/TerminalInterface.cc",
+  "file": "/home/kevin/Documents/debug_space/kinco_iface/TerminalInterface.cc"
+},
+{
+  "directory": "/home/kevin/Documents/debug_space/kinco_iface/build",
+  "command": "/usr/bin/g++ -I/usr/include/modbus -g -o CMakeFiles/kinco_iface_lib.dir/KincoDriver.cc.o -c /home/kevin/Documents/debug_space/kinco_iface/KincoDriver.cc",
+  "file": "/home/kevin/Documents/debug_space/kinco_iface/KincoDriver.cc"
+},
+{
+  "directory": "/home/kevin/Documents/debug_space/kinco_iface/build",
+  "command": "/usr/bin/g++ -I/usr/include/modbus -g -o CMakeFiles/main.dir/main.cc.o -c /home/kevin/Documents/debug_space/kinco_iface/main.cc",
+  "file": "/home/kevin/Documents/debug_space/kinco_iface/main.cc"
+}
+]
