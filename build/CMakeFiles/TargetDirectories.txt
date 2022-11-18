@@ -1,5 +1,0 @@
-/home/kevin/Documents/debug_space/kinco_iface/build/CMakeFiles/terminal_iface.dir
-/home/kevin/Documents/debug_space/kinco_iface/build/CMakeFiles/kinco_iface_lib.dir
-/home/kevin/Documents/debug_space/kinco_iface/build/CMakeFiles/main.dir
-/home/kevin/Documents/debug_space/kinco_iface/build/CMakeFiles/edit_cache.dir
-/home/kevin/Documents/debug_space/kinco_iface/build/CMakeFiles/rebuild_cache.dir

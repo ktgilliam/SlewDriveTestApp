@@ -7,13 +7,16 @@ find_package(PkgConfig)
 
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --libs libmodbus")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread" )
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/02_CMake_Modules/")
+find_package(Threads REQUIRED)
 find_package(Modbus REQUIRED)
 include_directories(${MODBUS_INCLUDE_DIRS} )
 
-add_library(terminal_iface TerminalInterface.cc)
-add_library(kinco_iface_lib KincoDriver.cc)
+# add_library(bash_wrapper SHARED bash_wrapper.cc)
+add_library(terminal_iface SHARED TerminalInterface.cc)
+add_library(kinco_iface_lib SHARED KincoDriver.cc)
 target_link_libraries(kinco_iface_lib terminal_iface ${MODBUS_LIBRARIES} ${MODBUS_LIBRARY})
 
 

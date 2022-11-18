@@ -13,19 +13,93 @@
 #include <stdio.h>
 #include <iostream>
 // #include <patch.h>
+#include <thread>
+#include <stdio.h>
+
+// #define BUFFER_LENGTH 65536
+// #include <unistd.h>
+
+std::ostringstream outBuff;
+std::istringstream inBuff;
+std::streambuf *coutbuf;
+std::streambuf *cinbuf;
+bool TerminalInterface::newInputFlag = false;
+auto savestdin = dup(STDIN_FILENO);
 
 //   collector(std::unique_ptr<std::ostringstream>(new std::ostringstream))
 TerminalInterface::TerminalInterface(const std::string &_label)
     : ifLabel(_label)
 {
+
+    // cinbuf = std::cin.rdbuf();
+    // // std::cin.rdbuf(inBuff.rdbuf());
+    // std::cout.rdbuf(outBuff.rdbuf());
+
     std::cout << VT100::CLEAR_CONSOLE;
     debugRowOffset = 0;
     debugMessageCount = 0;
     promptRow = TERM::NUM_HEADER_ROWS + 1;
     printHeader();
-    VT100::SET_WINDOW_SIZE(40, TERMINAL_WIDTH);
+    std::cout << VT100::SET_WINDOW_SIZE(40, TERMINAL_WIDTH);
     // resetPrompt();
+
+    // createPipes();
+    // std::cin.tie(NULL);
+    // std::cout.sync_with_stdio(false);
+    // setvbuf(stdout, NULL, _IONBF, BUFFER_LENGTH);
+    // std::thread inputThread(TerminalInterface::readInput);
+    // inputThread.detach();
 };
+
+TerminalInterface::~TerminalInterface()
+{
+    // std::cin.rdbuf(cinbuf);
+    // std::cout.rdbuf(coutbuf);
+}
+void TerminalInterface::readInput()
+{
+    std::cout << "INSIDE THREAD";
+    // std::istream is;
+    char inBuff[100];
+    int idx = 0;
+
+    // std::freopen("tmp.txt", "w", stdin);
+    // std::freopen("/tmp.txt", "w", stdout);
+    // fclose (stdout);
+    // std::freopen("/dev/null", "w", std::cout);
+    int count = 0;
+    while (1)
+    {
+
+        char c = (char)std::cin.peek();
+        if (c != std::ios_base::eofbit)
+        {
+            std::cout << std::hex << (unsigned int)c << std::endl;
+        }
+
+        // std::cout << count++;
+        // if (c != '\n')
+        // {
+        //     inBuff[idx++] = c;
+        //     // std::cout << "STILL INSIDE THREAD";
+        // }
+        // else
+        // {
+        //     std::cout << VT100::CURSOR_TO_ROW_COL(24, 5);
+        //     std::cout << "RECEIVED:: " << inBuff;
+        //     std::cout << std::flush;
+        //     idx = 0;
+        //     std::memset(inBuff, 0, sizeof(inBuff));
+        //     std::cout << VT100::CURSOR_TO_ROW_COL(24, 5);
+        //     std::cout << std::flush;
+        // }
+    }
+
+    // std::string line;
+    // std::getline(std::cin, line);
+
+    // std::cout << "RECEIVED:: " << line;
+}
 
 void TerminalInterface::printHeader()
 {
@@ -73,7 +147,14 @@ void TerminalInterface::serviceCLI()
     printf("[%o]", serviceCounter++);
 #endif
     // static int64_t cnt =0;
-    std::cout << VT100::CURSOR_TO_ROW_COL(promptRow, currentInputCol);
+    // std::cout << VT100::CURSOR_TO_ROW_COL(promptRow, currentInputCol);
+    // char c = (char)std::cin.peek();
+    // if (c != std::ios_base::eofbit)
+    // {
+    //     std::cout << "PAUSED!!!!!!!!!!!!!!!!!!!";
+    //     while(1){;}
+    //     // std::cout << std::hex << (unsigned int)c << std::endl;
+    // }
     // std::string tmp;
     // char c;
     // std::cin >> c;
@@ -111,20 +192,21 @@ void TerminalInterface::serviceCLI()
     // }
 }
 
-
-void inputCallback (std::ios::event ev, std::ios_base& stream, int index)
+void inputCallback(std::ios::event ev, std::ios_base &stream, int index)
 {
-  switch (ev)
-  {
+    switch (ev)
+    {
     case stream.copyfmt_event:
-      std::cout << "copyfmt_event\n"; break;
+        std::cout << "copyfmt_event\n";
+        break;
     case stream.imbue_event:
-      std::cout << "imbue_event\n"; break;
+        std::cout << "imbue_event\n";
+        break;
     case stream.erase_event:
-      std::cout << "erase_event\n"; break;
-  }
+        std::cout << "erase_event\n";
+        break;
+    }
 }
-
 
 void TerminalInterface::handleCliCommand()
 {

@@ -8,6 +8,7 @@
 #include <memory>
 #include <iostream> // std::cout, std::right, std::endl
 #include <iomanip>  // std::setw
+#include <unistd.h>
 
 #define CLI_BUFF_LENGTH 90
 
@@ -33,7 +34,6 @@ namespace VT100
     const char SHOW_CURSOR[] = "\033[?25h";
     const char SAVE_CURSOR[] = "\033 7";
     const char RESTORE_CURSOR[] = "\033 8";
-
 
     inline std::string CURSOR_TO_ROW_COL(unsigned row, unsigned col)
     {
@@ -106,6 +106,9 @@ protected:
         std::string label;
         bool printAsSexa;
     };
+    static bool newInputFlag;
+
+    static void createPipes();
 
 private:
     // std::unique_ptr<std::ostringstream> collector;
@@ -122,7 +125,8 @@ private:
 
 public:
     TerminalInterface(const std::string &);
-
+    virtual ~TerminalInterface();
+    static void readInput(); // int read_fd
     // void updateStatusFields(MountControl &);
     void serviceCLI();
     // void addDebugMessage(std::string&, uint8_t);
@@ -136,16 +140,13 @@ public:
     void updatePersistentField(uint8_t printRow, const T val);
     void printPersistentFieldLabels();
 
-void inputCallback (std::ios::event ev, std::ios_base& stream, int index);
+    void inputCallback(std::ios::event ev, std::ios_base &stream, int index);
     // clang-format off
 
     // clang-format on
 };
 
 int fs_sexa(char *out, double a, int w, int fracbase);
-
-
-
 
 template <>
 inline void TerminalInterface::updatePersistentField(uint8_t printRow, const double fieldVal)

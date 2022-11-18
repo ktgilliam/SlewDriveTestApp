@@ -184,11 +184,14 @@ void KincoDriver::updateTorqueCommand(double torque_setpoint)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 double KincoDriver::getVelocityFeedback(bool updateConsole)
 {
+    static double tmpv = 0.0;
+    tmpv += 0.001;
     // int32_t real_speed_units = readDriverRegister(KINKO::REAL_SPEED);
     auto real_speed_units = readDriverRegister<int32_t>(KINKO::REAL_SPEED);
     auto real_speed_rpm = convertSpeedIUtoRPM(real_speed_units);
     if(updateConsole && cli != nullptr)
     {
+        real_speed_rpm = tmpv;
         cli->updatePersistentField(KINKO::VEL_FB_ROW, real_speed_rpm);
     }
     return real_speed_rpm;
