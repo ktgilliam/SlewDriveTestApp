@@ -20,7 +20,7 @@ const char devPath[] = "/dev/ttyUSB0";
 #define TORQUE_MODE 0
 #define VELOCITY_MOE 1
 
-#define OP_MODE VELOCITY_MOE
+#define OP_MODE TORQUE_MODE
 
 #if OP_MODE == TORQUE_MODE
 #define PRD_SEC 30
@@ -53,17 +53,29 @@ KincoDriver *pDriveA;
 KincoDriver *pDriveB;
 std::ofstream logFile;
 
+double motorCommand = 0;
+
 void logDeltaTime()
 {
-    static std::chrono::steady_clock::time_point prevTime = std::chrono::steady_clock::now();
+    static std::chrono::steady_clock::time_point prevTime;
+    static bool firstTime = true;
     std::chrono::steady_clock::time_point nowTime = std::chrono::steady_clock::now();
-    std::string dtStr = std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(nowTime - prevTime).count());
-    logFile << dtStr << ",";
+    if (firstTime)
+    {
+        prevTime = nowTime;
+        firstTime = false;
+    }
+    int32_t delta_us = std::chrono::duration_cast<std::chrono::microseconds>(nowTime - prevTime).count();
     prevTime = nowTime;
+    if (delta_us < 0)
+        throw std::runtime_error("this broke");
+    std::string dtStr = std::to_string(delta_us);
+    logFile << dtStr << ",";
 }
 void collectFeedbackData()
 {
     logDeltaTime();
+    logFile << speedAmplitude * motorCommand << ",";
     logFile << pDriveA->getCurrentFeedback(TERMINAL_DRIVE_A) << ",";
     logFile << pDriveB->getCurrentFeedback(TERMINAL_DRIVE_B) << ",";
     logFile << pDriveA->getVelocityFeedback(TERMINAL_DRIVE_A) << ",";
@@ -86,7 +98,6 @@ void setupLogFile()
     // print header row:
     logFile << "dt_uS, CMD,CURA,CURB,VELA,VELB,POSA,POSB\n";
 }
-
 
 int main()
 {
@@ -127,13 +138,15 @@ int main()
             pDriveA->setDirectionMode(KINCO::CCW_IS_POSITIVE);
             pDriveB->setDirectionMode(KINCO::CW_IS_POSITIVE);
 
-            pDriveA->getPositionFeedback(TERMINAL_DRIVE_A);
+            // pDriveA->getPositionFeedback(TERMINAL_DRIVE_A);
             pDriveA->zeroPositionOffset();
-            pDriveA->getPositionFeedback(TERMINAL_DRIVE_A);
+            // pDriveA->getPositionFeedback(TERMINAL_DRIVE_A);
 
-            pDriveB->getPositionFeedback(TERMINAL_DRIVE_B);
+            // pDriveB->getPositionFeedback(TERMINAL_DRIVE_B);
             pDriveB->zeroPositionOffset();
-            pDriveB->getPositionFeedback(TERMINAL_DRIVE_B);
+            // pDriveB->getPositionFeedback(TERMINAL_DRIVE_B);
+
+            collectFeedbackData();
         }
         catch (const std::exception &e)
         {
@@ -172,15 +185,14 @@ int main()
                 constexpr double T_s = 1 / (double)F_s;
                 double arg = 2 * M_PI * T_s * n++ * f_0;
                 double cmd = std::sin(arg);
-
 #if OP_MODE == TORQUE_MODE
-                logFile << torqueAmplitude * cmd << ",";
-                pDriveA->updateTorqueCommand(torqueAmplitude * cmd);
-                pDriveB->updateTorqueCommand(torqueAmplitude * cmd);
+                motorCommand = torqueAmplitude * cmd;
+                pDriveA->updateTorqueCommand(motorCommand);
+                pDriveB->updateTorqueCommand(motorCommand);
 #elif OP_MODE == VELOCITY_MOE
-                logFile << speedAmplitude * cmd << ",";
-                pDriveA->updateVelocityCommand(speedAmplitude * cmd);
-                pDriveB->updateVelocityCommand(speedAmplitude * cmd);
+                motorCommand = speedAmplitude * cmd;
+                pDriveA->updateVelocityCommand(motorCommand);
+                pDriveB->updateVelocityCommand(motorCommand);
 #endif
 
                 int32_t slpPrd = (int32_t)T_s * 1000;
