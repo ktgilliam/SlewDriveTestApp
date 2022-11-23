@@ -1,7 +1,9 @@
 # define the project name
-project(kinko_iface C CXX)
+project(kinco_iface C CXX)
 cmake_minimum_required(VERSION 3.10)
-# set(CMAKE_BUILD_TYPE "")
+set(CXX_STANDARD 20)
+
+# CXX_STANDARD_REQUIRED
 include(GNUInstallDirs)
 find_package(PkgConfig)
 
@@ -18,20 +20,22 @@ include_directories(${MODBUS_INCLUDE_DIRS} )
 
 # add_library(bash_wrapper SHARED bash_wrapper.cc)
 add_library(terminal_iface SHARED TerminalInterface.cc)
-add_library(kinko_iface_lib SHARED KinkoDriver.cc)
-target_link_libraries(kinko_iface_lib terminal_iface ${MODBUS_LIBRARIES} ${MODBUS_LIBRARY})
+add_library(kinco_iface_lib SHARED KincoDriver.cc)
+target_link_libraries(kinco_iface_lib terminal_iface ${MODBUS_LIBRARIES} ${MODBUS_LIBRARY})
 
 
 add_executable(
     main
     main.cc
 )
-target_link_libraries(main terminal_iface kinko_iface_lib)
+
+
+target_link_libraries(main terminal_iface kinco_iface_lib)
 
 # add_executable(
 #     main
 #     main.cc
-#     kinkoDriver.cc
+#     kincoDriver.cc
 #     TerminalInterface.cc
 # )
 # target_link_libraries(main ${MODBUS_LIBRARIES} ${MODBUS_LIBRARY})

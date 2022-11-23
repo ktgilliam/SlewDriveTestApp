@@ -6,13 +6,13 @@
 // #include <memory>
 
 #include "ServoInterface.h"
-#include "KinkoNamespace.h"
+#include "KincoNamespace.h"
 #include "modbus/modbus.h"
 
 /* Temporary readability macro to avoid unused variables warnings */
 #define KINCO_UNUSED(x) (void)x
 
-namespace KINKO
+namespace KINCO
 {
 
     constexpr int drive_i_peak = 36;
@@ -42,7 +42,7 @@ namespace KINKO
     };
 }
 
-class KinkoDriver : public ServoInterface
+class KincoDriver : public ServoInterface
 {
 private:
     static modbus_t *ctx;
@@ -53,22 +53,18 @@ protected:
     int16_t driverNodeId;
 
 
-
-    static std::vector<KinkoDriver *> connectedDrives;
+    static std::vector<KincoDriver *> connectedDrives;
 
     int32_t encoderOffset;
     // std::vector<uint16_t>
 public:
-
     template <typename T>
     static T readDriverRegister(uint8_t devId, uint16_t modBusAddr);
 
     template <typename T>
     static uint16_t writeDriverRegisters(uint8_t devId, uint16_t modBusAddr, T reg_value);
-
-
-    KinkoDriver(int16_t driverId);
-    virtual ~KinkoDriver(){};
+    KincoDriver(int16_t driverId);
+    virtual ~KincoDriver(){};
     static bool readyForModbus();
     void setDriverState(uint16_t) override;
     void getDriverState() override{};
@@ -81,7 +77,7 @@ public:
     void updatePositionCommand(double) override;
     void updateVelocityCommand(double) override;
     void updateTorqueCommand(double) override;
-
+    
     void updateVelocityLimit(double velocity_limit);
 
     double getVelocityFeedback(bool updateConsole = false) override;
