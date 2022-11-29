@@ -18,19 +18,24 @@ find_package(Threads REQUIRED)
 find_package(Modbus REQUIRED)
 include_directories(${MODBUS_INCLUDE_DIRS} )
 
+set(PROJ_LIBS "")
 # add_library(bash_wrapper SHARED bash_wrapper.cc)
 add_library(terminal_iface SHARED TerminalInterface.cc)
+list(APPEND PROJ_LIBS terminal_iface)
+
 add_library(kinco_iface_lib SHARED KincoDriver.cc)
 target_link_libraries(kinco_iface_lib terminal_iface ${MODBUS_LIBRARIES} ${MODBUS_LIBRARY})
-
+list(APPEND PROJ_LIBS kinco_iface_lib)
 
 add_executable(
     main
     main.cc
+    SlewDriveTest.cc
 )
 
 
-target_link_libraries(main terminal_iface kinco_iface_lib)
+
+target_link_libraries(main ${PROJ_LIBS})
 
 # add_executable(
 #     main
