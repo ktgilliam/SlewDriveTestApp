@@ -77,6 +77,7 @@ bool KincoDriver::driverHandshake()
     }
     else
     {
+        DriveIsConnected = false;
         char errBuff[ERR_BUFF_SIZE];
         sprintf(errBuff, "driverHandshake ID %d, Connection failed. Modbuss Error: %s\n", driverNodeId, modbus_strerror(errno));
         throw std::runtime_error(errBuff);
@@ -277,7 +278,7 @@ void KincoDriver::updateTorqueCommand(double torque_setpoint)
 {
     if (!DriveIsConnected)
         throw std::runtime_error("updateTorqueCommand: Driver connection not established (call driverHandshake() first).");
-    int16_t torque_sp_percent = (int16_t)(torque_setpoint * 100 / 3.5);
+    int16_t torque_sp_percent = (int16_t)(torque_setpoint * 100 * 3.5);
     writeDriverRegisters<int32_t>(driverNodeId, KINCO::TARGET_TORQUE, torque_sp_percent);
 #if defined(LFAST_TERMINAL)
     if (cli != nullptr)
