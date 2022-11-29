@@ -277,7 +277,7 @@ void KincoDriver::updateTorqueCommand(double torque_setpoint)
 {
     if (!DriveIsConnected)
         throw std::runtime_error("updateTorqueCommand: Driver connection not established (call driverHandshake() first).");
-    int16_t torque_sp_percent = (int16_t)(torque_setpoint * 100);
+    int16_t torque_sp_percent = (int16_t)(torque_setpoint * 100 / 3.5);
     writeDriverRegisters<int32_t>(driverNodeId, KINCO::TARGET_TORQUE, torque_sp_percent);
 #if defined(LFAST_TERMINAL)
     if (cli != nullptr)

@@ -37,7 +37,7 @@ const int F_s = UPDATE_RATE_HZ;
 constexpr int stop_count = NUM_PERIODS * PRD_SEC * F_s;
 const unsigned int period_sec = PRD_SEC;
 
-const double torqueAmplitude = 4.0;
+const double torqueAmplitude = 1.0;
 const double speedAmplitude = KINCO::MOTOR_MAX_SPEED_RPM;
 
 // uint32_t posnVals[2][N];
