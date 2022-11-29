@@ -5,48 +5,18 @@
 #include <ctime>
 #include <cmath>
 
-
-#include "config.h"
-
 std::ofstream logFile;
 
 int drvAID = 1;
 int drvBID = 2;
 
-double motorCommand = 0;
-
 SlewDriveTest::SlewDriveTest()
 {
     pDriveA = new KincoDriver(drvAID);
     pDriveB = new KincoDriver(drvBID);
+    motorCommand = 0.0;
     connected = false;
-}
-
-void SlewDriveTest::setupLogFile()
-{
-    std::stringstream logPathSS;
-    const auto now = std::time(NULL);
-    const auto ptm = std::localtime(&now);
-    char timeBuff[80];
-    // Format: Mo, 15.06.2009 20:20:00
-    std::strftime(timeBuff, 32, "%Y_%m_%d_%H_%M_%OS", ptm);
-    logPathSS << "/home/kevin/Desktop/SlewDriveTestLogs/" << OP_MODE_STR << timeBuff << ".csv";
-    std::string logPathStr = logPathSS.str();
-    logFile.open(logPathStr.c_str(), std::ios::out);
-    // print header row:
-    logFile << "dt_uS, CMD,CURA,CURB,VELA,VELB,POSA,POSB\n";
-}
-
-void SlewDriveTest::setupTerminal(TerminalInterface *_terminal)
-{
-    this->terminal = _terminal;
-
-    if (TERMINAL_DRIVE_A)
-        pDriveA->connectTerminalInterface(terminal);
-    if (TERMINAL_DRIVE_B)
-        pDriveB->connectTerminalInterface(terminal);
-
-    terminal->printHeader();
+    testConfigured = false;
 }
 
 bool SlewDriveTest::connectToDrivers(const char *devPath)
@@ -60,14 +30,14 @@ bool SlewDriveTest::connectToDrivers(const char *devPath)
     }
     catch (const std::exception &e)
     {
-        terminal->addDebugMessage(e.what());
-        exit(1);
+        terminal->addDebugMessage(e.what(), TERM::ERROR);
+        // exit(1);
     }
     connected = result;
     return connected;
 }
 
-bool SlewDriveTest::configureDriversForTest()
+bool SlewDriveTest::configureDrivers()
 {
     try
     {
@@ -76,7 +46,8 @@ bool SlewDriveTest::configureDriversForTest()
 
         pDriveA->setDirectionMode(KINCO::CCW_IS_POSITIVE);
         pDriveB->setDirectionMode(KINCO::CW_IS_POSITIVE);
-
+        pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+        pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
         // pDriveA->getPositionFeedback(TERMINAL_DRIVE_A);
         pDriveA->zeroPositionOffset();
         // pDriveA->getPositionFeedback(TERMINAL_DRIVE_A);
@@ -92,50 +63,139 @@ bool SlewDriveTest::configureDriversForTest()
         pDriveB->updateTorqueCommand(0.0);
         pDriveA->setDriverState(KINCO::POWER_ON_MOTOR);
         pDriveB->setDriverState(KINCO::POWER_ON_MOTOR);
-
-#if OP_MODE == VELOCITY_MODE
-        pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
-        pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
-        // speedAmplitude = 100;
-#elif OP_MODE == TORQUE_MODE
-
-        pDriveA->setControlMode(KINCO::MOTOR_MODE_TORQUE);
-        pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
-
-        pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-        pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-        // auto maxSpeedIntA = KincoDriver::readDriverRegister<uint16_t>(drvAID, KINCO::MAX_SPEED);
-        // auto maxSpeedIntB = KincoDriver::readDriverRegister<uint16_t>(drvBID, KINCO::MAX_SPEED);
-        // pDriveB->setMaxSpeed(60);
-#endif
     }
     catch (const std::exception &e)
     {
-        terminal->addDebugMessage(e.what());
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
     return true;
 }
 
-void SlewDriveTest::updateCommands()
+void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
+{
+    sinTestParamsPtr = paramsPtr;
+    activeTestType = SINUSOID_TEST;
+    // stopCount = sinTestParamsPtr->num_prds * sinTestParamsPtr->prd_sec * sinTestParamsPtr->F_s;
+
+    if (sinTestParamsPtr->mode == SinTestParams::TORQUE_MODE)
+    {
+        if (std::abs(sinTestParamsPtr->amplitude) > 1.0)
+        {
+            terminal->addDebugMessage("Torque amplitude exceeds limit. Setting to 100%", TERM::WARNING);
+            sinTestParamsPtr->amplitude = 1.0;
+        }
+        try
+        {
+            pDriveA->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+            pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+            pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+            pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+    }
+    else if (sinTestParamsPtr->mode == SinTestParams::VELOCITY_MODE)
+    {
+
+        try
+        {
+            pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+            pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+    }
+}
+
+void SlewDriveTest::updateSinCommands()
 {
     static long int testCounter = 0;
-
-
     double N = (double)testCounter++;
+    double T_s = 1.0 / sinTestParamsPtr->F_s;
+    double f_0 = 1 / (double)sinTestParamsPtr->prd_sec;
     double arg = 2 * M_PI * T_s * N * f_0;
     double cmd = std::sin(arg);
-#if OP_MODE == TORQUE_MODE
-    motorCommand = torqueAmplitude * cmd;
-    pDriveA->updateTorqueCommand(motorCommand);
-    pDriveB->updateTorqueCommand(motorCommand);
-#elif OP_MODE == VELOCITY_MODE
-    motorCommand = speedAmplitude * cmd;
-    pDriveA->updateVelocityCommand(motorCommand);
-    pDriveB->updateVelocityCommand(motorCommand);
-#endif
+
+    motorCommand = sinTestParamsPtr->amplitude * cmd;
+
+    if (sinTestParamsPtr->mode == SinTestParams::TORQUE_MODE)
+    {
+        try
+        {
+            pDriveA->updateTorqueCommand(motorCommand);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+        try
+        {
+            pDriveB->updateTorqueCommand(motorCommand);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+    }
+    else if (sinTestParamsPtr->mode == SinTestParams::VELOCITY_MODE)
+    {
+        try
+        {
+            pDriveA->updateVelocityCommand(motorCommand);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+        try
+        {
+            pDriveB->updateVelocityCommand(motorCommand);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+    }
     collectFeedbackData();
 }
 
+void SlewDriveTest::setupLogFile(const char *testIdStr)
+{
+    std::stringstream logPathSS;
+    const auto now = std::time(NULL);
+    const auto ptm = std::localtime(&now);
+    char timeBuff[80];
+    // Format: Mo, 15.06.2009 20:20:00
+    std::strftime(timeBuff, 32, "%Y_%m_%d_%H_%M_%OS", ptm);
+    logPathSS << "/home/kevin/Desktop/SlewDriveTestLogs/" << testIdStr << timeBuff << ".csv";
+    std::string logPathStr = logPathSS.str();
+    logFile.open(logPathStr.c_str(), std::ios::out);
+    // print header row:
+    logFile << "dt_uS, CMD,CURA,CURB,VELA,VELB,POSA,POSB\n";
+}
+
+void SlewDriveTest::collectFeedbackData()
+{
+    logDeltaTime();
+    logFile << motorCommand << ",";
+    try
+    {
+        logFile << pDriveA->getCurrentFeedback(true) << ",";
+        logFile << pDriveB->getCurrentFeedback(true) << ",";
+        logFile << pDriveA->getVelocityFeedback(true) << ",";
+        logFile << pDriveB->getVelocityFeedback(true) << ",";
+        logFile << pDriveA->getPositionFeedback(true) << ",";
+        logFile << pDriveB->getPositionFeedback(true) << "\n";
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+}
 
 void SlewDriveTest::logDeltaTime()
 {
@@ -155,27 +215,32 @@ void SlewDriveTest::logDeltaTime()
     logFile << dtStr << ",";
 }
 
-void SlewDriveTest::collectFeedbackData()
+void SlewDriveTest::setupTerminal(TerminalInterface *_terminal)
 {
-    logDeltaTime();
-    logFile << speedAmplitude * motorCommand << ",";
-    logFile << pDriveA->getCurrentFeedback(TERMINAL_DRIVE_A) << ",";
-    logFile << pDriveB->getCurrentFeedback(TERMINAL_DRIVE_B) << ",";
-    logFile << pDriveA->getVelocityFeedback(TERMINAL_DRIVE_A) << ",";
-    logFile << pDriveB->getVelocityFeedback(TERMINAL_DRIVE_B) << ",";
-    logFile << pDriveA->getPositionFeedback(TERMINAL_DRIVE_A) << ",";
-    logFile << pDriveB->getPositionFeedback(TERMINAL_DRIVE_B) << "\n";
+    this->terminal = _terminal;
+
+    pDriveA->connectTerminalInterface(terminal);
+    pDriveB->connectTerminalInterface(terminal);
+
+    terminal->printHeader();
 }
 
 void SlewDriveTest::shutdown()
 {
-    #if OP_MODE == TORQUE_MODE
-    pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-    pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-#endif
     logFile.close();
-    pDriveA->updateVelocityCommand(0);
-    pDriveA->setDriverState(KINCO::POWER_OFF_MOTOR);
-    pDriveB->updateVelocityCommand(0);
-    pDriveB->setDriverState(KINCO::POWER_OFF_MOTOR);
+
+    try
+    {
+        pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+        pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+
+        pDriveA->updateVelocityCommand(0);
+        pDriveA->setDriverState(KINCO::POWER_OFF_MOTOR);
+        pDriveB->updateVelocityCommand(0);
+        pDriveB->setDriverState(KINCO::POWER_OFF_MOTOR);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
 }
