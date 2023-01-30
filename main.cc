@@ -9,7 +9,6 @@
 #include <chrono>
 #include <thread>
 
-
 #include <chrono>
 #include <ctime>
 
@@ -18,7 +17,6 @@
 #include "KincoDriver.h"
 
 const char devPath[] = "/dev/ttyUSB0";
-
 
 int main()
 {
@@ -37,10 +35,12 @@ int main()
 #elif OP_MODE == VELOCITY_SIN_MODE
     SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, SinTestParams::VELOCITY_MODE);
     testObj->configureTest(sinTestParams);
+
+#elif OP_MODE == FRICTION_TEST_MODE
+    FrictionTestParams *frictionTestParams = new FrictionTestParams(MAX_SPEED, STEPS_PER_SIDE, STEP_DURATION, UPDATE_RATE_HZ);
+    testObj->configureTest(frictionTestParams);
 #endif
 
-    unsigned cnt = 0;
-    unsigned switchCnt = 0;
     bool keepGoing = true;
 
     if (connected)
@@ -51,13 +51,12 @@ int main()
             while (keepGoing)
             {
                 // testObj->testUpdate();
-                std::thread tu = testObj->testUpdate();
-                constexpr double T_s = 1.0/UPDATE_RATE_HZ;
+                constexpr double T_s = 1.0 / UPDATE_RATE_HZ;
                 int32_t slpPrd = (int32_t)T_s * 1000;
+                std::thread tu = testObj->testUpdate();
                 std::this_thread::sleep_for(std::chrono::milliseconds(slpPrd));
                 tu.join();
-                if (cnt++ >= stop_count)
-                    keepGoing = false;
+                keepGoing = !testObj->testComplete();
             }
         }
         catch (const std::exception &e)
