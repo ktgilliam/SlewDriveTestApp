@@ -17,6 +17,8 @@ SlewDriveTest::SlewDriveTest()
     motorCommand = 0.0;
     connected = false;
     testConfigured = false;
+    testCounter = 0;
+    testIsDone = false;
 }
 
 bool SlewDriveTest::connectToDrivers(const char *devPath)
@@ -73,6 +75,8 @@ bool SlewDriveTest::configureDrivers()
 
 void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
 {
+    if (paramsPtr == nullptr)
+        throw std::runtime_error("configureTest:: nullptr");
     sinTestParamsPtr = paramsPtr;
     activeTestType = SINUSOID_TEST;
     // stopCount = sinTestParamsPtr->num_prds * sinTestParamsPtr->prd_sec * sinTestParamsPtr->F_s;
@@ -111,10 +115,80 @@ void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
     }
 }
 
+void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
+{
+    if (paramsPtr == nullptr)
+        throw std::runtime_error("configureTest:: nullptr");
+    frictionTestParamsPtr = paramsPtr;
+    activeTestType = FRICTION_TEST;
+
+    int numSteps = (4 * frictionTestParamsPtr->steps_per_side);
+    frictionTestParamsPtr->counts_per_step = frictionTestParamsPtr->step_duration * frictionTestParamsPtr->F_s;
+    frictionTestParamsPtr->stop_count = (unsigned)(numSteps * frictionTestParamsPtr->counts_per_step);
+
+    try
+    {
+        pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+        pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+
+    frictionTestParamsPtr->testSpeeds.reserve(numSteps);
+    double speedStepSize = frictionTestParamsPtr->max_speed / (double)(frictionTestParamsPtr->steps_per_side);
+
+    // first step at zero
+    frictionTestParamsPtr->testSpeeds.push_back(0.0);
+
+    // negative, speeding up
+    for (int ii = 1; ii <= frictionTestParamsPtr->steps_per_side; ii++)
+    {
+        double step_speed = (double)ii * speedStepSize * -1.0;
+        frictionTestParamsPtr->testSpeeds.push_back(step_speed);
+    }
+    // negative, slowing down
+    for (int ii = frictionTestParamsPtr->steps_per_side - 1; ii >= 0; ii--)
+    {
+        double step_speed = (double)ii * speedStepSize * -1.0;
+        frictionTestParamsPtr->testSpeeds.push_back(step_speed);
+    }
+    // positive, speeding up
+    for (int ii = 1; ii <= frictionTestParamsPtr->steps_per_side; ii++)
+    {
+        double step_speed = (double)ii * speedStepSize;
+        frictionTestParamsPtr->testSpeeds.push_back(step_speed);
+    }
+    // positive, slowing down
+    for (int ii = frictionTestParamsPtr->steps_per_side - 1; ii >= 0; ii--)
+    {
+        double step_speed = (double)ii * speedStepSize;
+        frictionTestParamsPtr->testSpeeds.push_back(step_speed);
+    }
+}
+
+void SlewDriveTest::updateCommands()
+{
+    switch (activeTestType)
+    {
+    case SINUSOID_TEST:
+        updateSinCommands();
+        break;
+    case FRICTION_TEST:
+        updateFrictionCommands();
+        break;
+    }
+}
+
 void SlewDriveTest::updateSinCommands()
 {
-    static long int testCounter = 0;
-    double N = (double)testCounter++;
+    if (testCounter++ >= sinTestParamsPtr->stop_count)
+    {
+        testIsDone = true;
+        return;
+    }
+    double N = (double)testCounter;
     double T_s = 1.0 / sinTestParamsPtr->F_s;
     double f_0 = 1 / (double)sinTestParamsPtr->prd_sec;
     double arg = 2 * M_PI * T_s * N * f_0;
@@ -163,6 +237,41 @@ void SlewDriveTest::updateSinCommands()
     collectFeedbackData();
 }
 
+void SlewDriveTest::updateFrictionCommands()
+{
+    if (testCounter++ >= frictionTestParamsPtr->stop_count)
+    {
+        testIsDone = true;
+        return;
+    }
+
+    unsigned step_idx = testCounter / frictionTestParamsPtr->counts_per_step;
+    motorCommand = frictionTestParamsPtr->testSpeeds.at(step_idx);
+    try
+    {
+        // motorCommand = 50;
+        pDriveA->updateVelocityCommand(motorCommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+    try
+    {
+        // motorCommand = 0;
+        pDriveB->updateVelocityCommand(motorCommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+    collectFeedbackData();
+}
+
+bool SlewDriveTest::testComplete()
+{
+    return testIsDone;
+}
 void SlewDriveTest::setupLogFile(const char *testIdStr)
 {
     std::stringstream logPathSS;
@@ -243,4 +352,6 @@ void SlewDriveTest::shutdown()
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
+
+    std::cout << VT100::CURSOR_TO_ROW_COL(50, 0);
 }
