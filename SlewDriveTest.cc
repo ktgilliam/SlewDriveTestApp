@@ -1,5 +1,5 @@
 #include "SlewDriveTest.h"
-
+#include "config.h"
 #include <fstream>
 #include <chrono>
 #include <ctime>
@@ -9,6 +9,13 @@ std::ofstream logFile;
 
 int drvAID = 1;
 int drvBID = 2;
+
+inline double frictionTorque(double speed_rpm)
+{
+    double coulomb = std::signbit(speed_rpm) ? -1 * COULOMB_FRICTION_NM : COULOMB_FRICTION_NM;
+    double viscous = speed_rpm * VISCOUS_FRICTION_NMPERRPM;
+    return coulomb + viscous;
+}
 
 SlewDriveTest::SlewDriveTest()
 {
@@ -81,7 +88,7 @@ void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
     activeTestType = SINUSOID_TEST;
     // stopCount = sinTestParamsPtr->num_prds * sinTestParamsPtr->prd_sec * sinTestParamsPtr->F_s;
 
-    if (sinTestParamsPtr->mode == SinTestParams::TORQUE_MODE)
+    if (sinTestParamsPtr->mode == TORQUE_MODE)
     {
         if (std::abs(sinTestParamsPtr->amplitude) > 1.0)
         {
@@ -100,13 +107,27 @@ void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
             terminal->addDebugMessage(e.what(), TERM::WARNING);
         }
     }
-    else if (sinTestParamsPtr->mode == SinTestParams::VELOCITY_MODE)
+    else if (sinTestParamsPtr->mode == VELOCITY_MODE)
     {
 
         try
         {
             pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
             pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+    }
+    else if (sinTestParamsPtr->mode == MIXED_MODE)
+    {
+
+        try
+        {
+            pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+            pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+            pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
         }
         catch (const std::exception &e)
         {
@@ -168,6 +189,34 @@ void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
     }
 }
 
+void SlewDriveTest::configureTest(MysteryTestParams *const paramsPtr)
+{
+    if (paramsPtr == nullptr)
+        throw std::runtime_error("configureTest:: nullptr");
+    mysteryTestParamsPtr = paramsPtr;
+    activeTestType = MYSTERY_TEST;
+    mysteryTestParamsPtr->ramp_step_counts = mysteryTestParamsPtr->ramp_duration * mysteryTestParamsPtr->F_s;
+    mysteryTestParamsPtr->hold_step_counts = mysteryTestParamsPtr->hold_duration * mysteryTestParamsPtr->F_s;
+    mysteryTestParamsPtr->stop_count = 2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts;
+    mysteryTestParamsPtr->testSpeeds.reserve(mysteryTestParamsPtr->stop_count);
+
+    double ramp_dv = mysteryTestParamsPtr->max_speed / mysteryTestParamsPtr->ramp_step_counts;
+    double curRampSpeed = 0.0;
+    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    {
+        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        curRampSpeed += ramp_dv;
+    }
+    for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
+    {
+        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed);
+    }
+    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    {
+        curRampSpeed -= ramp_dv;
+        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+    }
+}
 void SlewDriveTest::updateCommands()
 {
     switch (activeTestType)
@@ -177,6 +226,9 @@ void SlewDriveTest::updateCommands()
         break;
     case FRICTION_TEST:
         updateFrictionCommands();
+        break;
+    case MYSTERY_TEST:
+        updateMysteryCommands();
         break;
     }
 }
@@ -196,7 +248,7 @@ void SlewDriveTest::updateSinCommands()
 
     motorCommand = sinTestParamsPtr->amplitude * cmd;
 
-    if (sinTestParamsPtr->mode == SinTestParams::TORQUE_MODE)
+    if (sinTestParamsPtr->mode == TORQUE_MODE)
     {
         try
         {
@@ -215,7 +267,7 @@ void SlewDriveTest::updateSinCommands()
             terminal->addDebugMessage(e.what(), TERM::WARNING);
         }
     }
-    else if (sinTestParamsPtr->mode == SinTestParams::VELOCITY_MODE)
+    else if (sinTestParamsPtr->mode == VELOCITY_MODE)
     {
         try
         {
@@ -228,6 +280,26 @@ void SlewDriveTest::updateSinCommands()
         try
         {
             pDriveB->updateVelocityCommand(motorCommand);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+    }
+    else if (sinTestParamsPtr->mode == MIXED_MODE)
+    {
+        try
+        {
+            pDriveA->updateVelocityCommand(motorCommand);
+        }
+        catch (const std::exception &e)
+        {
+            terminal->addDebugMessage(e.what(), TERM::WARNING);
+        }
+        try
+        {
+            double trqCmd = frictionTorque(motorCommand) * 0.5;
+            pDriveB->updateTorqueCommand(trqCmd);
         }
         catch (const std::exception &e)
         {
@@ -260,6 +332,36 @@ void SlewDriveTest::updateFrictionCommands()
     {
         // motorCommand = 0;
         pDriveB->updateVelocityCommand(motorCommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+    collectFeedbackData();
+}
+
+void SlewDriveTest::updateMysteryCommands()
+{
+    if (testCounter >= mysteryTestParamsPtr->stop_count)
+    {
+        testIsDone = true;
+        return;
+    }
+
+    motorCommand = mysteryTestParamsPtr->testSpeeds.at(testCounter++);
+
+    try
+    {
+        pDriveA->updateVelocityCommand(motorCommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+    try
+    {
+        double trqCmd = frictionTorque(motorCommand) * 0.5;
+        pDriveB->updateTorqueCommand(trqCmd);
     }
     catch (const std::exception &e)
     {

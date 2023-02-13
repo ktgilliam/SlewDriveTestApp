@@ -15,6 +15,7 @@
 #include "config.h"
 #include "SlewDriveTest.h"
 #include "KincoDriver.h"
+#include "TerminalInterface.h"
 
 const char devPath[] = "/dev/ttyUSB0";
 
@@ -26,19 +27,27 @@ int main()
     TerminalInterface *terminal = new TerminalInterface("SLEW DRIVE TEST INTERFACE");
     testObj->setupTerminal(terminal);
     bool connected = testObj->connectToDrivers(devPath);
-
+    // connected = true;
     testObj->configureDrivers();
 
 #if OP_MODE == TORQUE_SIN_MODE
-    SinTestParams *sinTestParams = new SinTestParams(TORQUE_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, SinTestParams::TORQUE_MODE);
+    SinTestParams *sinTestParams = new SinTestParams(TORQUE_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, TORQUE_MODE);
     testObj->configureTest(sinTestParams);
 #elif OP_MODE == VELOCITY_SIN_MODE
-    SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, SinTestParams::VELOCITY_MODE);
+#if !MIXED_CONTROL_TEST_MODE
+    SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, VELOCITY_MODE);
+#else
+    SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, MIXED_MODE);
+#endif
     testObj->configureTest(sinTestParams);
 
 #elif OP_MODE == FRICTION_TEST_MODE
     FrictionTestParams *frictionTestParams = new FrictionTestParams(MAX_SPEED, STEPS_PER_SIDE, STEP_DURATION, UPDATE_RATE_HZ);
     testObj->configureTest(frictionTestParams);
+
+#elif OP_MODE == MYSTERY_TEST_MODE
+    MysteryTestParams *mysteryTestParams = new MysteryTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
+    testObj->configureTest(mysteryTestParams);
 #endif
 
     bool keepGoing = true;

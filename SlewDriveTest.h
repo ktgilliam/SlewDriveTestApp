@@ -6,9 +6,15 @@ enum
 {
     SINUSOID_TEST,
     FRICTION_TEST,
-    JSSG_2006
+    JSSG_2006,
+    MYSTERY_TEST,
 };
-
+enum
+{
+    TORQUE_MODE,
+    VELOCITY_MODE,
+    MIXED_MODE
+};
 struct SinTestParams
 {
     SinTestParams(double _amplitude, double _prd_sec, unsigned _num_prds, unsigned _F_s, uint8_t _type, uint8_t _mode)
@@ -21,11 +27,7 @@ struct SinTestParams
     {
         stop_count = (unsigned)(_num_prds * _prd_sec * _F_s);
     };
-    enum
-    {
-        TORQUE_MODE,
-        VELOCITY_MODE
-    };
+
     double amplitude;
     double prd_sec;
     unsigned num_prds;
@@ -48,6 +50,20 @@ struct FrictionTestParams
     std::vector<double> testSpeeds;
 };
 
+struct MysteryTestParams
+{
+    MysteryTestParams(double _max_speed, double _ramp_duration, double _hold_duration, unsigned _F_s)
+        : max_speed(_max_speed), ramp_duration(_ramp_duration), hold_duration(_hold_duration), F_s(_F_s) { }
+    double max_speed;
+    unsigned F_s;
+    double ramp_duration;
+    double hold_duration;
+    unsigned ramp_step_counts;
+    unsigned hold_step_counts;
+    long unsigned stop_count;
+    std::vector<double> testSpeeds;
+};
+
 class SlewDriveTest
 {
 private:
@@ -55,6 +71,7 @@ private:
     // unsigned stopCount;
     SinTestParams *sinTestParamsPtr;
     FrictionTestParams *frictionTestParamsPtr;
+    MysteryTestParams *mysteryTestParamsPtr;
 
     uint8_t activeTestType;
     KincoDriver *pDriveA;
@@ -64,7 +81,8 @@ private:
     bool testConfigured;
     void updateCommands();
     void updateSinCommands();
-        void updateFrictionCommands();
+    void updateFrictionCommands();
+    void updateMysteryCommands();
     unsigned testCounter;
     bool testIsDone;
 
@@ -78,6 +96,8 @@ public:
     bool configureDrivers();
     void configureTest(SinTestParams *const paramsPtr);
     void configureTest(FrictionTestParams *const paramsPtr);
+    void configureTest(MysteryTestParams *const paramsPtr);
+
     void shutdown();
 
     std::thread testUpdate()
@@ -85,5 +105,6 @@ public:
         return std::thread([=]
                            { updateCommands(); });
     }
+
     bool testComplete();
 };
