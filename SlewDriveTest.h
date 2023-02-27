@@ -50,9 +50,9 @@ struct FrictionTestParams
     std::vector<double> testSpeeds;
 };
 
-struct MysteryTestParams
+struct MixedModeTestParams
 {
-    MysteryTestParams(double _max_speed, double _ramp_duration, double _hold_duration, unsigned _F_s)
+    MixedModeTestParams(double _max_speed, double _ramp_duration, double _hold_duration, unsigned _F_s)
         : max_speed(_max_speed), ramp_duration(_ramp_duration), hold_duration(_hold_duration), F_s(_F_s) { }
     double max_speed;
     unsigned F_s;
@@ -67,11 +67,12 @@ struct MysteryTestParams
 class SlewDriveTest
 {
 private:
-    double motorCommand;
+    double motorACommand;
+    double motorBCommand;
     // unsigned stopCount;
     SinTestParams *sinTestParamsPtr;
     FrictionTestParams *frictionTestParamsPtr;
-    MysteryTestParams *mysteryTestParamsPtr;
+    MixedModeTestParams *mysteryTestParamsPtr;
 
     uint8_t activeTestType;
     KincoDriver *pDriveA;
@@ -96,7 +97,7 @@ public:
     bool configureDrivers();
     void configureTest(SinTestParams *const paramsPtr);
     void configureTest(FrictionTestParams *const paramsPtr);
-    void configureTest(MysteryTestParams *const paramsPtr);
+    void configureTest(MixedModeTestParams *const paramsPtr);
 
     void shutdown();
 

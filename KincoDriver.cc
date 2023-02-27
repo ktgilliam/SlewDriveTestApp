@@ -4,6 +4,7 @@
 #include <string>
 #include <stdexcept>
 
+#include "config.h"
 #include "KincoNamespace.h"
 #include "BitFieldUtil.h"
 #include "math_util.h"
@@ -241,9 +242,9 @@ void KincoDriver::updatePositionCommand(double posn_setpoint)
 #if defined(LFAST_TERMINAL)
     if (cli != nullptr)
     {
-        if (driverNodeId == 1)
+        if (driverNodeId == DRIVER_A_ID)
             cli->updatePersistentField(KINCO::CMD_ROW_A, posn_setpoint);
-        else if (driverNodeId == 2)
+        else if (driverNodeId == DRIVER_B_ID)
             cli->updatePersistentField(KINCO::CMD_ROW_B, posn_setpoint);
     }
 #endif
@@ -263,9 +264,9 @@ void KincoDriver::updateVelocityCommand(double velocity_setpoint)
 #if defined(LFAST_TERMINAL)
     if (cli != nullptr)
     {
-        if (driverNodeId == 1)
+        if (driverNodeId == DRIVER_A_ID)
             cli->updatePersistentField(KINCO::CMD_ROW_A, velocity_setpoint);
-        else if (driverNodeId == 2)
+        else if (driverNodeId == DRIVER_B_ID)
             cli->updatePersistentField(KINCO::CMD_ROW_B, velocity_setpoint);
     }
 #endif
@@ -283,9 +284,9 @@ void KincoDriver::updateTorqueCommand(double torque_setpoint)
 #if defined(LFAST_TERMINAL)
     if (cli != nullptr)
     {
-        if (driverNodeId == 1)
+        if (driverNodeId == DRIVER_A_ID)
             cli->updatePersistentField(KINCO::CMD_ROW_A, torque_sp_percent);
-        else if (driverNodeId == 2)
+        else if (driverNodeId == DRIVER_B_ID)
             cli->updatePersistentField(KINCO::CMD_ROW_B, torque_sp_percent);
     }
 #endif
@@ -314,9 +315,9 @@ double KincoDriver::getVelocityFeedback(bool updateConsole)
 #if defined(LFAST_TERMINAL)
     if (updateConsole && cli != nullptr)
     {
-        if (driverNodeId == 1)
+        if (driverNodeId == DRIVER_A_ID)
             cli->updatePersistentField(KINCO::VEL_FB_ROW_A, real_speed_rpm);
-        else if (driverNodeId == 2)
+        else if (driverNodeId == DRIVER_B_ID)
             cli->updatePersistentField(KINCO::VEL_FB_ROW_B, real_speed_rpm);
     }
 #endif
@@ -336,9 +337,9 @@ double KincoDriver::getCurrentFeedback(bool updateConsole)
 #if defined(LFAST_TERMINAL)
     if (updateConsole && cli != nullptr)
     {
-        if (driverNodeId == 1)
+        if (driverNodeId == DRIVER_A_ID)
             cli->updatePersistentField(KINCO::TRQ_FB_ROW_A, real_current_units);
-        else if (driverNodeId == 2)
+        else if (driverNodeId == DRIVER_B_ID)
             cli->updatePersistentField(KINCO::TRQ_FB_ROW_B, real_current_units);
     }
 #endif
@@ -362,9 +363,9 @@ double KincoDriver::getPositionFeedback(bool updateConsole)
 #if defined(LFAST_TERMINAL)
     if (updateConsole && cli != nullptr)
     {
-        if (driverNodeId == 1)
+        if (driverNodeId == DRIVER_A_ID)
             cli->updatePersistentField(KINCO::POSN_FB_ROW_A, encoder_counts_offs);
-        else if (driverNodeId == 2)
+        else if (driverNodeId == DRIVER_B_ID)
             cli->updatePersistentField(KINCO::POSN_FB_ROW_B, encoder_counts_offs);
     }
 #endif

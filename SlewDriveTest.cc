@@ -7,13 +7,15 @@
 
 std::ofstream logFile;
 
-int drvAID = 1;
-int drvBID = 2;
+// int drvAID = 1;
+// int drvBID = 2;
+int drvAID = DRIVER_A_ID;
+int drvBID = DRIVER_B_ID;
 
 inline double frictionTorque(double speed_rpm)
 {
     double coulomb = std::signbit(speed_rpm) ? -1 * COULOMB_FRICTION_NM : COULOMB_FRICTION_NM;
-    double viscous = speed_rpm * VISCOUS_FRICTION_NMPERRPM;
+    double viscous = speed_rpm * VISCOUS_FRICTION_NM_PER_RPM;
     return coulomb + viscous;
 }
 
@@ -21,7 +23,8 @@ SlewDriveTest::SlewDriveTest()
 {
     pDriveA = new KincoDriver(drvAID);
     pDriveB = new KincoDriver(drvBID);
-    motorCommand = 0.0;
+    motorACommand = 0.0;
+    motorBCommand = 0.0;
     connected = false;
     testConfigured = false;
     testCounter = 0;
@@ -122,7 +125,6 @@ void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
     }
     else if (sinTestParamsPtr->mode == MIXED_MODE)
     {
-
         try
         {
             pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
@@ -189,7 +191,7 @@ void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
     }
 }
 
-void SlewDriveTest::configureTest(MysteryTestParams *const paramsPtr)
+void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
 {
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
@@ -199,6 +201,16 @@ void SlewDriveTest::configureTest(MysteryTestParams *const paramsPtr)
     mysteryTestParamsPtr->hold_step_counts = mysteryTestParamsPtr->hold_duration * mysteryTestParamsPtr->F_s;
     mysteryTestParamsPtr->stop_count = 2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts;
     mysteryTestParamsPtr->testSpeeds.reserve(mysteryTestParamsPtr->stop_count);
+
+    try
+    {
+        pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+        pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
 
     double ramp_dv = mysteryTestParamsPtr->max_speed / mysteryTestParamsPtr->ramp_step_counts;
     double curRampSpeed = 0.0;
@@ -246,13 +258,13 @@ void SlewDriveTest::updateSinCommands()
     double arg = 2 * M_PI * T_s * N * f_0;
     double cmd = std::sin(arg);
 
-    motorCommand = sinTestParamsPtr->amplitude * cmd;
-
+    motorACommand = sinTestParamsPtr->amplitude * cmd;
+    motorBCommand = motorACommand;
     if (sinTestParamsPtr->mode == TORQUE_MODE)
     {
         try
         {
-            pDriveA->updateTorqueCommand(motorCommand);
+            pDriveA->updateTorqueCommand(motorACommand);
         }
         catch (const std::exception &e)
         {
@@ -260,7 +272,7 @@ void SlewDriveTest::updateSinCommands()
         }
         try
         {
-            pDriveB->updateTorqueCommand(motorCommand);
+            pDriveB->updateTorqueCommand(motorBCommand);
         }
         catch (const std::exception &e)
         {
@@ -271,7 +283,7 @@ void SlewDriveTest::updateSinCommands()
     {
         try
         {
-            pDriveA->updateVelocityCommand(motorCommand);
+            pDriveA->updateVelocityCommand(motorACommand);
         }
         catch (const std::exception &e)
         {
@@ -279,7 +291,7 @@ void SlewDriveTest::updateSinCommands()
         }
         try
         {
-            pDriveB->updateVelocityCommand(motorCommand);
+            pDriveB->updateVelocityCommand(motorBCommand);
         }
         catch (const std::exception &e)
         {
@@ -290,7 +302,7 @@ void SlewDriveTest::updateSinCommands()
     {
         try
         {
-            pDriveA->updateVelocityCommand(motorCommand);
+            pDriveA->updateVelocityCommand(motorACommand);
         }
         catch (const std::exception &e)
         {
@@ -298,7 +310,7 @@ void SlewDriveTest::updateSinCommands()
         }
         try
         {
-            double trqCmd = frictionTorque(motorCommand) * 0.5;
+            double trqCmd = frictionTorque(motorBCommand) * 0.5;
             pDriveB->updateTorqueCommand(trqCmd);
         }
         catch (const std::exception &e)
@@ -318,11 +330,12 @@ void SlewDriveTest::updateFrictionCommands()
     }
 
     unsigned step_idx = testCounter / frictionTestParamsPtr->counts_per_step;
-    motorCommand = frictionTestParamsPtr->testSpeeds.at(step_idx);
+    motorACommand = frictionTestParamsPtr->testSpeeds.at(step_idx);
+    motorBCommand = motorACommand;
     try
     {
         // motorCommand = 50;
-        pDriveA->updateVelocityCommand(motorCommand);
+        pDriveA->updateVelocityCommand(motorACommand);
     }
     catch (const std::exception &e)
     {
@@ -331,7 +344,7 @@ void SlewDriveTest::updateFrictionCommands()
     try
     {
         // motorCommand = 0;
-        pDriveB->updateVelocityCommand(motorCommand);
+        pDriveB->updateVelocityCommand(motorBCommand);
     }
     catch (const std::exception &e)
     {
@@ -348,11 +361,11 @@ void SlewDriveTest::updateMysteryCommands()
         return;
     }
 
-    motorCommand = mysteryTestParamsPtr->testSpeeds.at(testCounter++);
+    motorACommand = mysteryTestParamsPtr->testSpeeds.at(testCounter++);
 
     try
     {
-        pDriveA->updateVelocityCommand(motorCommand);
+        pDriveA->updateVelocityCommand(motorACommand);
     }
     catch (const std::exception &e)
     {
@@ -360,8 +373,9 @@ void SlewDriveTest::updateMysteryCommands()
     }
     try
     {
-        double trqCmd = frictionTorque(motorCommand) * 0.5;
-        pDriveB->updateTorqueCommand(trqCmd);
+        motorBCommand = frictionTorque(motorACommand) * 0.5;
+
+        pDriveB->updateTorqueCommand(motorBCommand);
     }
     catch (const std::exception &e)
     {
@@ -382,17 +396,17 @@ void SlewDriveTest::setupLogFile(const char *testIdStr)
     char timeBuff[80];
     // Format: Mo, 15.06.2009 20:20:00
     std::strftime(timeBuff, 32, "%Y_%m_%d_%H_%M_%OS", ptm);
-    logPathSS << "/home/kevin/Desktop/SlewDriveTestLogs/" << testIdStr << timeBuff << ".csv";
+    logPathSS << "/home/kevin/lfast_shared/SlewDriveTestLogs/" << testIdStr << timeBuff << ".csv";
     std::string logPathStr = logPathSS.str();
     logFile.open(logPathStr.c_str(), std::ios::out);
     // print header row:
-    logFile << "dt_uS, CMD,CURA,CURB,VELA,VELB,POSA,POSB\n";
+    logFile << "dt_uS,CMDA,CMDB,CURA,CURB,VELA,VELB,POSA,POSB\n";
 }
 
 void SlewDriveTest::collectFeedbackData()
 {
     logDeltaTime();
-    logFile << motorCommand << ",";
+    logFile << motorACommand << "," << motorBCommand << ",";
     try
     {
         logFile << pDriveA->getCurrentFeedback(true) << ",";

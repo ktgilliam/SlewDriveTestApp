@@ -9,7 +9,7 @@
 #include <chrono>
 #include <thread>
 
-#include <chrono>
+#include <chrono>   
 #include <ctime>
 
 #include "config.h"
@@ -34,19 +34,13 @@ int main()
     SinTestParams *sinTestParams = new SinTestParams(TORQUE_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, TORQUE_MODE);
     testObj->configureTest(sinTestParams);
 #elif OP_MODE == VELOCITY_SIN_MODE
-#if !MIXED_CONTROL_TEST_MODE
     SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, VELOCITY_MODE);
-#else
-    SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, MIXED_MODE);
-#endif
     testObj->configureTest(sinTestParams);
-
 #elif OP_MODE == FRICTION_TEST_MODE
     FrictionTestParams *frictionTestParams = new FrictionTestParams(MAX_SPEED, STEPS_PER_SIDE, STEP_DURATION, UPDATE_RATE_HZ);
     testObj->configureTest(frictionTestParams);
-
-#elif OP_MODE == MYSTERY_TEST_MODE
-    MysteryTestParams *mysteryTestParams = new MysteryTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
+#elif OP_MODE == MIXED_CTRL_TEST_MODE
+    MixedModeTestParams *mysteryTestParams = new MixedModeTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
     testObj->configureTest(mysteryTestParams);
 #endif
 
