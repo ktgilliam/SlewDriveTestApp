@@ -45,9 +45,9 @@ int main()
     FrictionTestParams *frictionTestParams = new FrictionTestParams(MAX_SPEED, STEPS_PER_SIDE, STEP_DURATION, UPDATE_RATE_HZ);
     testObj->configureTest(frictionTestParams);
 
-#elif OP_MODE == MYSTERY_TEST_MODE
-    RampTestParams *mysteryTestParams = new RampTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
-    testObj->configureTest(mysteryTestParams);
+#elif OP_MODE == RAMP_TEST_MODE
+    RampTestParams *rampTestParams = new RampTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
+    testObj->configureTest(rampTestParams);
 #endif
 
     bool keepGoing = true;
