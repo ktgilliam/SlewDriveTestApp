@@ -189,7 +189,7 @@ void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
     }
 }
 
-void SlewDriveTest::configureTest(MysteryTestParams *const paramsPtr)
+void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
 {
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
@@ -360,8 +360,12 @@ void SlewDriveTest::updateMysteryCommands()
     }
     try
     {
+        #if MIXED_MODE == true
         double trqCmd = frictionTorque(motorCommand) * 0.5;
         pDriveB->updateTorqueCommand(trqCmd);
+        #else
+        pDriveB->updateVelocityCommand(motorCommand);
+        #endif
     }
     catch (const std::exception &e)
     {
@@ -418,7 +422,7 @@ void SlewDriveTest::logDeltaTime()
         prevTime = nowTime;
         firstTime = false;
     }
-    int32_t delta_us = std::chrono::duration_cast<std::chrono::microseconds>(nowTime - prevTime).count();
+    int32_t delta_us = std::chrono::duration_cast<std::chrono::milliseconds>(nowTime - prevTime).count();
     prevTime = nowTime;
     if (delta_us < 0)
         throw std::runtime_error("this broke");

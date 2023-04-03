@@ -46,7 +46,7 @@ int main()
     testObj->configureTest(frictionTestParams);
 
 #elif OP_MODE == MYSTERY_TEST_MODE
-    MysteryTestParams *mysteryTestParams = new MysteryTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
+    RampTestParams *mysteryTestParams = new RampTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
     testObj->configureTest(mysteryTestParams);
 #endif
 
@@ -61,7 +61,7 @@ int main()
             {
                 // testObj->testUpdate();
                 constexpr double T_s = 1.0 / UPDATE_RATE_HZ;
-                int32_t slpPrd = (int32_t)T_s * 1000;
+                constexpr int32_t slpPrd = (int32_t)T_s * 1000;
                 std::thread tu = testObj->testUpdate();
                 std::this_thread::sleep_for(std::chrono::milliseconds(slpPrd));
                 tu.join();

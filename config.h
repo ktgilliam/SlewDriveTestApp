@@ -6,12 +6,12 @@
 #define TORQUE_SIN_MODE 0
 #define VELOCITY_SIN_MODE 1
 #define FRICTION_TEST_MODE 2
-#define MYSTERY_TEST_MODE 3
+#define RAMP_TEST_MODE 3
 
 
 #define MIXED_CONTROL_TEST_MODE true
 
-#define OP_MODE MYSTERY_TEST_MODE
+#define OP_MODE RAMP_TEST_MODE
 
 #if OP_MODE == TORQUE_SIN_MODE
 #define NUM_PERIODS 5
@@ -36,12 +36,16 @@ const double STEP_DURATION = 2.0;
 // constexpr unsigned stop_count = (unsigned)TEST_DURATION * UPDATE_RATE_HZ + 1;
 const double MAX_SPEED = KINCO::MOTOR_MAX_SPEED_RPM;
 
-#elif OP_MODE == MYSTERY_TEST_MODE
-#define OP_MODE_STR "SDR_MYSTERY_"
+#elif OP_MODE == RAMP_TEST_MODE
+#define MIXED_MODE false
+#if MIXED_MODE
+#define OP_MODE_STR "SDR_RAMP_VT_"
+#else
+#define OP_MODE_STR "SDR_RAMP_VV_"
+#endif
 const double MAX_SPEED = KINCO::MOTOR_MAX_SPEED_RPM;
 const double RAMP_DURATION = 5.0;
 const double HOLD_DURATION = 10.0;
-
 #endif
 
 const bool TERMINAL_DRIVE_A = true;
