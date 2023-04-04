@@ -72,7 +72,7 @@ private:
     // unsigned stopCount;
     SinTestParams *sinTestParamsPtr;
     FrictionTestParams *frictionTestParamsPtr;
-    RampTestParams *mysteryTestParamsPtr;
+    RampTestParams *rampTestParamsPtr;
 
     KincoDriver *pDriveA;
     KincoDriver *pDriveB;

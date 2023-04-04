@@ -190,11 +190,11 @@ void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
 {
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
-    mysteryTestParamsPtr = paramsPtr;
-    mysteryTestParamsPtr->ramp_step_counts = mysteryTestParamsPtr->ramp_duration * mysteryTestParamsPtr->F_s;
-    mysteryTestParamsPtr->hold_step_counts = mysteryTestParamsPtr->hold_duration * mysteryTestParamsPtr->F_s;
-    mysteryTestParamsPtr->stop_count = 2 * (2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts);
-    mysteryTestParamsPtr->testSpeeds.reserve(mysteryTestParamsPtr->stop_count);
+    rampTestParamsPtr = paramsPtr;
+    rampTestParamsPtr->ramp_step_counts = rampTestParamsPtr->ramp_duration * rampTestParamsPtr->F_s;
+    rampTestParamsPtr->hold_step_counts = rampTestParamsPtr->hold_duration * rampTestParamsPtr->F_s;
+    rampTestParamsPtr->stop_count = 2 * (2 * rampTestParamsPtr->ramp_step_counts + rampTestParamsPtr->hold_step_counts);
+    rampTestParamsPtr->testSpeeds.reserve(rampTestParamsPtr->stop_count);
 
     try
     {
@@ -214,46 +214,46 @@ void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
 
-    double ramp_dv = mysteryTestParamsPtr->max_speed / mysteryTestParamsPtr->ramp_step_counts;
+    double ramp_dv = rampTestParamsPtr->max_speed / rampTestParamsPtr->ramp_step_counts;
     double curRampSpeed = 0.0;
 #if BOTH_DIRECTIONS
-    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
         curRampSpeed += ramp_dv;
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->hold_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed);
+        rampTestParamsPtr->testSpeeds.push_back(rampTestParamsPtr->max_speed);
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts * 2; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts * 2; ii++)
     {
         curRampSpeed -= ramp_dv;
-        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->hold_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed * -1);
+        rampTestParamsPtr->testSpeeds.push_back(rampTestParamsPtr->max_speed * -1);
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
         curRampSpeed += ramp_dv;
     }
 #else
-    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
         curRampSpeed += ramp_dv;
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->hold_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed);
+        rampTestParamsPtr->testSpeeds.push_back(rampTestParamsPtr->max_speed);
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
         curRampSpeed -= ramp_dv;
-        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
     }
 #endif
 }
@@ -396,13 +396,13 @@ void SlewDriveTest::updateFrictionCommands()
 void SlewDriveTest::updateRampTestCommands()
 {
     collectFeedbackData();
-    if (testCounter >= mysteryTestParamsPtr->stop_count)
+    if (testCounter >= rampTestParamsPtr->stop_count)
     {
         testIsDone = true;
         return;
     }
-    // if(testCounter <= mysteryTestParamsPtr->testSpeeds.size())
-    motorACommand = mysteryTestParamsPtr->testSpeeds.at(testCounter);
+    // if(testCounter <= rampTestParamsPtr->testSpeeds.size())
+    motorACommand = rampTestParamsPtr->testSpeeds.at(testCounter);
     // else
     // return;
     try
