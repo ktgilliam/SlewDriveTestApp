@@ -199,7 +199,7 @@ void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
     activeTestType = MYSTERY_TEST;
     mysteryTestParamsPtr->ramp_step_counts = mysteryTestParamsPtr->ramp_duration * mysteryTestParamsPtr->F_s;
     mysteryTestParamsPtr->hold_step_counts = mysteryTestParamsPtr->hold_duration * mysteryTestParamsPtr->F_s;
-    mysteryTestParamsPtr->stop_count = 2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts;
+    mysteryTestParamsPtr->stop_count = 2* (2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts);
     mysteryTestParamsPtr->testSpeeds.reserve(mysteryTestParamsPtr->stop_count);
 
     try
@@ -214,6 +214,31 @@ void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
 
     double ramp_dv = mysteryTestParamsPtr->max_speed / mysteryTestParamsPtr->ramp_step_counts;
     double curRampSpeed = 0.0;
+    #if BOTH_DIRECTIONS
+    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    {
+        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        curRampSpeed += ramp_dv;
+    }
+    for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
+    {
+        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed);
+    }
+    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts*2; ii++)
+    {
+        curRampSpeed -= ramp_dv;
+        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+    }
+    for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
+    {
+        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed*-1);
+    }
+    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
+    {
+        mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        curRampSpeed += ramp_dv;
+    }
+#else
     for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
     {
         mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
@@ -228,6 +253,8 @@ void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
         curRampSpeed -= ramp_dv;
         mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
     }
+#endif
+
 }
 void SlewDriveTest::updateCommands()
 {
@@ -257,7 +284,7 @@ void SlewDriveTest::updateSinCommands()
     double f_0 = 1 / (double)sinTestParamsPtr->prd_sec;
     double arg = 2 * M_PI * T_s * N * f_0;
     double cmd = std::sin(arg);
-
+    // if (cmd < 0) cmd = 0;
     motorACommand = sinTestParamsPtr->amplitude * cmd;
     motorBCommand = motorACommand;
     if (sinTestParamsPtr->mode == TORQUE_MODE)
@@ -298,26 +325,26 @@ void SlewDriveTest::updateSinCommands()
             terminal->addDebugMessage(e.what(), TERM::WARNING);
         }
     }
-    else if (sinTestParamsPtr->mode == MIXED_MODE)
-    {
-        try
-        {
-            pDriveA->updateVelocityCommand(motorACommand);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
-        try
-        {
-            double trqCmd = frictionTorque(motorBCommand) * 0.5;
-            pDriveB->updateTorqueCommand(trqCmd);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
-    }
+    // else if (sinTestParamsPtr->mode == MIXED_MODE)
+    // {
+    //     try
+    //     {
+    //         pDriveA->updateVelocityCommand(motorACommand);
+    //     }
+    //     catch (const std::exception &e)
+    //     {
+    //         terminal->addDebugMessage(e.what(), TERM::WARNING);
+    //     }
+    //     try
+    //     {
+    //         double trqCmd = frictionTorque(motorBCommand) * 0.5;
+    //         pDriveB->updateTorqueCommand(trqCmd);
+    //     }
+    //     catch (const std::exception &e)
+    //     {
+    //         terminal->addDebugMessage(e.what(), TERM::WARNING);
+    //     }
+    // }
     collectFeedbackData();
 }
 
@@ -360,9 +387,10 @@ void SlewDriveTest::updateMysteryCommands()
         testIsDone = true;
         return;
     }
-
-    motorACommand = mysteryTestParamsPtr->testSpeeds.at(testCounter++);
-
+    // if(testCounter <= mysteryTestParamsPtr->testSpeeds.size())
+    motorACommand = mysteryTestParamsPtr->testSpeeds.at(testCounter);
+    // else
+    // return;
     try
     {
         pDriveA->updateVelocityCommand(motorACommand);
@@ -382,6 +410,7 @@ void SlewDriveTest::updateMysteryCommands()
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
     collectFeedbackData();
+    testCounter++;
 }
 
 bool SlewDriveTest::testComplete()

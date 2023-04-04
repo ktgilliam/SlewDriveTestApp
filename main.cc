@@ -55,9 +55,9 @@ int main()
             {
                 // testObj->testUpdate();
                 constexpr double T_s = 1.0 / UPDATE_RATE_HZ;
-                int32_t slpPrd = (int32_t)T_s * 1000;
+                int32_t slpPrd_ms = (int32_t)T_s * 1000;
                 std::thread tu = testObj->testUpdate();
-                std::this_thread::sleep_for(std::chrono::milliseconds(slpPrd));
+                std::this_thread::sleep_for(std::chrono::milliseconds(slpPrd_ms));
                 tu.join();
                 keepGoing = !testObj->testComplete();
             }

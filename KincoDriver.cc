@@ -257,8 +257,8 @@ void KincoDriver::updateVelocityCommand(double velocity_setpoint)
 {
     if (!DriveIsConnected)
         throw std::runtime_error("updateVelocityCommand: Driver connection not established (call driverHandshake() first).");
-
-    double vsp_saturated = saturate(velocity_setpoint, - KINCO::MOTOR_MAX_SPEED_RPM,  KINCO::MOTOR_MAX_SPEED_RPM);
+    double vsp_saturated = velocity_setpoint;
+    // double vsp_saturated = saturate(velocity_setpoint, -1*KINCO::MOTOR_MAX_SPEED_RPM,  KINCO::MOTOR_MAX_SPEED_RPM);
     int32_t vsp_IU = convertSpeedRPMtoIU(vsp_saturated);
     writeDriverRegisters<int32_t>(driverNodeId, KINCO::TARGET_SPEED, vsp_IU);
 #if defined(LFAST_TERMINAL)
