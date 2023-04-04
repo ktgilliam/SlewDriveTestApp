@@ -2,27 +2,27 @@
 #include <thread>
 #include <vector>
 
-enum
-{
-    SINUSOID_TEST,
-    FRICTION_TEST,
-    JSSG_2006,
-    MYSTERY_TEST,
-};
-enum
-{
-    TORQUE_MODE,
-    VELOCITY_MODE,
-    MIXED_MODE
-};
+// enum
+// {
+//     SINUSOID_TEST,
+//     FRICTION_TEST,
+//     JSSG_2006,
+//     RAMP_TEST,
+// };
+// enum
+// {
+//     TORQUE_MODE,
+//     VELOCITY_MODE,
+//     // MIXED_MODE
+// };
 struct SinTestParams
 {
-    SinTestParams(double _amplitude, double _prd_sec, unsigned _num_prds, unsigned _F_s, uint8_t _type, uint8_t _mode)
+    SinTestParams(double _amplitude, double _prd_sec, unsigned _num_prds, unsigned _F_s, uint8_t _mode)
         : amplitude(_amplitude),
           prd_sec(_prd_sec),
           num_prds(_num_prds),
           F_s(_F_s),
-          type(_type),
+        //   type(_type),
           mode(_mode)
     {
         stop_count = (unsigned)(_num_prds * _prd_sec * _F_s);
@@ -50,9 +50,9 @@ struct FrictionTestParams
     std::vector<double> testSpeeds;
 };
 
-struct MixedModeTestParams
+struct RampTestParams
 {
-    MixedModeTestParams(double _max_speed, double _ramp_duration, double _hold_duration, unsigned _F_s)
+    RampTestParams(double _max_speed, double _ramp_duration, double _hold_duration, unsigned _F_s)
         : max_speed(_max_speed), ramp_duration(_ramp_duration), hold_duration(_hold_duration), F_s(_F_s) { }
     double max_speed;
     unsigned F_s;
@@ -72,9 +72,8 @@ private:
     // unsigned stopCount;
     SinTestParams *sinTestParamsPtr;
     FrictionTestParams *frictionTestParamsPtr;
-    MixedModeTestParams *mysteryTestParamsPtr;
+    RampTestParams *mysteryTestParamsPtr;
 
-    uint8_t activeTestType;
     KincoDriver *pDriveA;
     KincoDriver *pDriveB;
     TerminalInterface *terminal;
@@ -83,7 +82,7 @@ private:
     void updateCommands();
     void updateSinCommands();
     void updateFrictionCommands();
-    void updateMysteryCommands();
+    void updateRampTestCommands();
     unsigned testCounter;
     bool testIsDone;
 
@@ -97,7 +96,7 @@ public:
     bool configureDrivers();
     void configureTest(SinTestParams *const paramsPtr);
     void configureTest(FrictionTestParams *const paramsPtr);
-    void configureTest(MixedModeTestParams *const paramsPtr);
+    void configureTest(RampTestParams *const paramsPtr);
 
     void shutdown();
 

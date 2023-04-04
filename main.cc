@@ -30,18 +30,19 @@ int main()
     // connected = true;
     testObj->configureDrivers();
 
-#if OP_MODE == TORQUE_SIN_MODE
-    SinTestParams *sinTestParams = new SinTestParams(TORQUE_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, TORQUE_MODE);
+#if OP_MODE == TORQUE_SIN_TEST_MODE
+    SinTestParams *sinTestParams = new SinTestParams(TORQUE_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, TORQUE_SIN_TEST_MODE);
     testObj->configureTest(sinTestParams);
-#elif OP_MODE == VELOCITY_SIN_MODE
-    SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, SINUSOID_TEST, VELOCITY_MODE);
+#elif OP_MODE == VELOCITY_SIN_TEST_MODE
+    SinTestParams *sinTestParams = new SinTestParams(SPEED_AMPLITUDE, PRD_SEC, NUM_PERIODS, UPDATE_RATE_HZ, VELOCITY_SIN_TEST_MODE);
     testObj->configureTest(sinTestParams);
 #elif OP_MODE == FRICTION_TEST_MODE
     FrictionTestParams *frictionTestParams = new FrictionTestParams(MAX_SPEED, STEPS_PER_SIDE, STEP_DURATION, UPDATE_RATE_HZ);
     testObj->configureTest(frictionTestParams);
-#elif OP_MODE == MIXED_CTRL_TEST_MODE
-    MixedModeTestParams *mysteryTestParams = new MixedModeTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
-    testObj->configureTest(mysteryTestParams);
+
+#elif OP_MODE == RAMP_TEST_MODE
+    RampTestParams *rampTestParams = new RampTestParams(MAX_SPEED, RAMP_DURATION, HOLD_DURATION, UPDATE_RATE_HZ);
+    testObj->configureTest(rampTestParams);
 #endif
 
     bool keepGoing = true;
@@ -55,9 +56,9 @@ int main()
             {
                 // testObj->testUpdate();
                 constexpr double T_s = 1.0 / UPDATE_RATE_HZ;
-                int32_t slpPrd_ms = (int32_t)T_s * 1000;
+                constexpr int32_t slpPrd_us = (int32_t)T_s * 1000000;
                 std::thread tu = testObj->testUpdate();
-                std::this_thread::sleep_for(std::chrono::milliseconds(slpPrd_ms));
+                std::this_thread::sleep_for(std::chrono::microseconds(slpPrd_us));
                 tu.join();
                 keepGoing = !testObj->testComplete();
             }

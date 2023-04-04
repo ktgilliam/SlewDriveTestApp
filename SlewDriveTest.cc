@@ -83,67 +83,60 @@ bool SlewDriveTest::configureDrivers()
     return true;
 }
 
+#if OP_MODE == TORQUE_SIN_TEST_MODE || OP_MODE == VELOCITY_SIN_TEST_MODE
 void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
 {
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
     sinTestParamsPtr = paramsPtr;
-    activeTestType = SINUSOID_TEST;
     // stopCount = sinTestParamsPtr->num_prds * sinTestParamsPtr->prd_sec * sinTestParamsPtr->F_s;
 
-    if (sinTestParamsPtr->mode == TORQUE_MODE)
+#if OP_MODE == TORQUE_SIN_TEST_MODE
+    if (std::abs(sinTestParamsPtr->amplitude) > 1.0)
     {
-        if (std::abs(sinTestParamsPtr->amplitude) > 1.0)
-        {
-            terminal->addDebugMessage("Torque amplitude exceeds limit. Setting to 100%", TERM::WARNING);
-            sinTestParamsPtr->amplitude = 1.0;
-        }
-        try
-        {
-            pDriveA->setControlMode(KINCO::MOTOR_MODE_TORQUE);
-            pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
-            pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-            pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
+        terminal->addDebugMessage("Warning: Torque amplitude exceeds limit.", TERM::WARNING);
+        // terminal->addDebugMessage("Torque amplitude exceeds limit. Setting to 100%", TERM::WARNING);
+        // sinTestParamsPtr->amplitude = 1.0;
     }
-    else if (sinTestParamsPtr->mode == VELOCITY_MODE)
+    try
     {
+        pDriveA->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+        pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+        pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+        pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+#elif OP_MODE == VELOCITY_SIN_TEST_MODE
 
-        try
-        {
-            pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
-            pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
-    }
-    else if (sinTestParamsPtr->mode == MIXED_MODE)
+    try
     {
-        try
-        {
-            pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
-            pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
-            pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
+        pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+#if MOTOR_B_MODE == MOTOR_VELOCITY_MODE
+        pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
+#elif MOTOR_B_MODE == MOTOR_TORQUE_MODE
+        pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+#else
+#error INVALID MOTOR CONFIGURATION
+#endif
     }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+
+#endif
 }
+#endif
 
+#if OP_MODE == FRICTION_TEST_MODE
 void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
 {
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
     frictionTestParamsPtr = paramsPtr;
-    activeTestType = FRICTION_TEST;
 
     int numSteps = (4 * frictionTestParamsPtr->steps_per_side);
     frictionTestParamsPtr->counts_per_step = frictionTestParamsPtr->step_duration * frictionTestParamsPtr->F_s;
@@ -190,22 +183,31 @@ void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
         frictionTestParamsPtr->testSpeeds.push_back(step_speed);
     }
 }
+#endif
 
-void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
+#if OP_MODE == RAMP_TEST_MODE
+void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
 {
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
     mysteryTestParamsPtr = paramsPtr;
-    activeTestType = MYSTERY_TEST;
     mysteryTestParamsPtr->ramp_step_counts = mysteryTestParamsPtr->ramp_duration * mysteryTestParamsPtr->F_s;
     mysteryTestParamsPtr->hold_step_counts = mysteryTestParamsPtr->hold_duration * mysteryTestParamsPtr->F_s;
-    mysteryTestParamsPtr->stop_count = 2* (2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts);
+    mysteryTestParamsPtr->stop_count = 2 * (2 * mysteryTestParamsPtr->ramp_step_counts + mysteryTestParamsPtr->hold_step_counts);
     mysteryTestParamsPtr->testSpeeds.reserve(mysteryTestParamsPtr->stop_count);
 
     try
     {
         pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+#if MOTOR_B_MODE == MOTOR_VELOCITY_MODE
+        pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
+#elif MOTOR_B_MODE == MOTOR_TORQUE_MODE
         pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+#else
+#error INVALID MOTOR CONFIGURATION
+#endif
+        // pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+        // pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
     }
     catch (const std::exception &e)
     {
@@ -214,7 +216,7 @@ void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
 
     double ramp_dv = mysteryTestParamsPtr->max_speed / mysteryTestParamsPtr->ramp_step_counts;
     double curRampSpeed = 0.0;
-    #if BOTH_DIRECTIONS
+#if BOTH_DIRECTIONS
     for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
     {
         mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
@@ -224,14 +226,14 @@ void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
     {
         mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed);
     }
-    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts*2; ii++)
+    for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts * 2; ii++)
     {
         curRampSpeed -= ramp_dv;
         mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
     }
     for (int ii = 0; ii < mysteryTestParamsPtr->hold_step_counts; ii++)
     {
-        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed*-1);
+        mysteryTestParamsPtr->testSpeeds.push_back(mysteryTestParamsPtr->max_speed * -1);
     }
     for (int ii = 0; ii < mysteryTestParamsPtr->ramp_step_counts; ii++)
     {
@@ -254,27 +256,25 @@ void SlewDriveTest::configureTest(MixedModeTestParams *const paramsPtr)
         mysteryTestParamsPtr->testSpeeds.push_back(curRampSpeed);
     }
 #endif
-
 }
+#endif
+
 void SlewDriveTest::updateCommands()
 {
-    switch (activeTestType)
-    {
-    case SINUSOID_TEST:
-        updateSinCommands();
-        break;
-    case FRICTION_TEST:
-        updateFrictionCommands();
-        break;
-    case MYSTERY_TEST:
-        updateMysteryCommands();
-        break;
-    }
+#if OP_MODE == VELOCITY_SIN_TEST_MODE || OP_MODE == TORQUE_SIN_TEST_MODE
+    updateSinCommands();
+#elif OP_MODE == FRICTION_TEST_MODE
+    updateFrictionCommands();
+#elif OP_MODE == RAMP_TEST_MODE
+    updateRampTestCommands();
+#endif
 }
 
+#if OP_MODE == TORQUE_SIN_TEST_MODE || OP_MODE == VELOCITY_SIN_TEST_MODE
 void SlewDriveTest::updateSinCommands()
 {
-    if (testCounter++ >= sinTestParamsPtr->stop_count)
+    collectFeedbackData();
+    if (testCounter >= sinTestParamsPtr->stop_count)
     {
         testIsDone = true;
         return;
@@ -286,71 +286,82 @@ void SlewDriveTest::updateSinCommands()
     double cmd = std::sin(arg);
     // if (cmd < 0) cmd = 0;
     motorACommand = sinTestParamsPtr->amplitude * cmd;
+#if OP_MODE == TORQUE_SIN_TEST_MODE
     motorBCommand = motorACommand;
-    if (sinTestParamsPtr->mode == TORQUE_MODE)
+    try
     {
-        try
-        {
-            pDriveA->updateTorqueCommand(motorACommand);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
-        try
-        {
-            pDriveB->updateTorqueCommand(motorBCommand);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
+        pDriveA->updateTorqueCommand(motorACommand);
     }
-    else if (sinTestParamsPtr->mode == VELOCITY_MODE)
+    catch (const std::exception &e)
     {
-        try
-        {
-            pDriveA->updateVelocityCommand(motorACommand);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
-        try
-        {
-            pDriveB->updateVelocityCommand(motorBCommand);
-        }
-        catch (const std::exception &e)
-        {
-            terminal->addDebugMessage(e.what(), TERM::WARNING);
-        }
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
-    // else if (sinTestParamsPtr->mode == MIXED_MODE)
-    // {
-    //     try
-    //     {
-    //         pDriveA->updateVelocityCommand(motorACommand);
-    //     }
-    //     catch (const std::exception &e)
-    //     {
-    //         terminal->addDebugMessage(e.what(), TERM::WARNING);
-    //     }
-    //     try
-    //     {
-    //         double trqCmd = frictionTorque(motorBCommand) * 0.5;
-    //         pDriveB->updateTorqueCommand(trqCmd);
-    //     }
-    //     catch (const std::exception &e)
-    //     {
-    //         terminal->addDebugMessage(e.what(), TERM::WARNING);
-    //     }
-    // }
-    collectFeedbackData();
-}
+    try
+    {
+        pDriveB->updateTorqueCommand(motorBCommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+#elif OP_MODE == VELOCITY_SIN_TEST_MODE
+    try
+    {
+        pDriveA->updateVelocityCommand(motorACommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+    try
+    {
 
+#if MOTOR_B_MODE == MOTOR_TORQUE_MODE
+        double trqCmd = frictionTorque(motorACommand) * 0.5;
+        pDriveB->updateTorqueCommand(trqCmd);
+#elif MOTOR_B_MODE == MOTOR_VELOCITY_MODE
+        motorBCommand = motorACommand;
+        pDriveB->updateVelocityCommand(motorBCommand);
+#endif
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+#elif OP_MODE == VELOCITY_SIN_TEST_MODE
+
+    try
+    {
+        pDriveA->updateVelocityCommand(motorACommand);
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+    try
+    {
+#if MOTOR_B_MODE == MOTOR_TORQUE_MODE
+        double trqCmd = frictionTorque(motorACommand) * 0.5;
+        pDriveB->updateTorqueCommand(trqCmd);
+#elif MOTOR_B_MODE == MOTOR_VELOCITY_MODE
+        motorBCommand = motorACommand;
+        pDriveB->updateVelocityCommand(motorBCommand);
+#endif
+    }
+    catch (const std::exception &e)
+    {
+        terminal->addDebugMessage(e.what(), TERM::WARNING);
+    }
+#endif
+    testCounter++;
+}
+#endif
+
+#if OP_MODE == FRICTION_TEST_MODE
 void SlewDriveTest::updateFrictionCommands()
 {
-    if (testCounter++ >= frictionTestParamsPtr->stop_count)
+    collectFeedbackData();
+    if (testCounter >= frictionTestParamsPtr->stop_count)
     {
         testIsDone = true;
         return;
@@ -377,11 +388,14 @@ void SlewDriveTest::updateFrictionCommands()
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
-    collectFeedbackData();
+    testCounter++;
 }
+#endif
 
-void SlewDriveTest::updateMysteryCommands()
+#if OP_MODE == RAMP_TEST_MODE
+void SlewDriveTest::updateRampTestCommands()
 {
+    collectFeedbackData();
     if (testCounter >= mysteryTestParamsPtr->stop_count)
     {
         testIsDone = true;
@@ -401,17 +415,21 @@ void SlewDriveTest::updateMysteryCommands()
     }
     try
     {
-        motorBCommand = frictionTorque(motorACommand) * 0.5;
-
-        pDriveB->updateTorqueCommand(motorBCommand);
+#if MOTOR_B_MODE == MOTOR_TORQUE_MODE
+        double trqCmd = frictionTorque(motorACommand) * 0.5;
+        pDriveB->updateTorqueCommand(trqCmd);
+#elif MOTOR_B_MODE == MOTOR_VELOCITY_MODE
+        motorBCommand = motorACommand;
+        pDriveB->updateVelocityCommand(motorBCommand);
+#endif
     }
     catch (const std::exception &e)
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
-    collectFeedbackData();
     testCounter++;
 }
+#endif
 
 bool SlewDriveTest::testComplete()
 {
@@ -435,15 +453,22 @@ void SlewDriveTest::setupLogFile(const char *testIdStr)
 void SlewDriveTest::collectFeedbackData()
 {
     logDeltaTime();
+    static uint16_t cnt = 0;
+    bool updateConsole = false;
+    if (cnt++ >= CONSOLE_DOWNSAMPLE)
+    {
+        updateConsole = true;
+        cnt = 0;
+    }
     logFile << motorACommand << "," << motorBCommand << ",";
     try
     {
-        logFile << pDriveA->getCurrentFeedback(true) << ",";
-        logFile << pDriveB->getCurrentFeedback(true) << ",";
-        logFile << pDriveA->getVelocityFeedback(true) << ",";
-        logFile << pDriveB->getVelocityFeedback(true) << ",";
-        logFile << pDriveA->getPositionFeedback(true) << ",";
-        logFile << pDriveB->getPositionFeedback(true) << "\n";
+        logFile << pDriveA->getCurrentFeedback(updateConsole) << ",";
+        logFile << pDriveB->getCurrentFeedback(updateConsole) << ",";
+        logFile << pDriveA->getVelocityFeedback(updateConsole) << ",";
+        logFile << pDriveB->getVelocityFeedback(updateConsole) << ",";
+        logFile << pDriveA->getPositionFeedback(updateConsole) << ",";
+        logFile << pDriveB->getPositionFeedback(updateConsole) << "\n";
     }
     catch (const std::exception &e)
     {
@@ -461,7 +486,7 @@ void SlewDriveTest::logDeltaTime()
         prevTime = nowTime;
         firstTime = false;
     }
-    int32_t delta_us = std::chrono::duration_cast<std::chrono::microseconds>(nowTime - prevTime).count();
+    int32_t delta_us = std::chrono::duration_cast<std::chrono::milliseconds>(nowTime - prevTime).count();
     prevTime = nowTime;
     if (delta_us < 0)
         throw std::runtime_error("this broke");
