@@ -443,8 +443,8 @@ void SlewDriveTest::setupLogFile(const char *testIdStr)
     char timeBuff[80];
     // Format: Mo, 15.06.2009 20:20:00
     std::strftime(timeBuff, 32, "%Y_%m_%d_%H_%M_%OS", ptm);
-    logPathSS << "/home/kevin/lfast_shared/SlewDriveTestLogs/04_04_23/" << testIdStr << timeBuff << ".csv";
-    std::string logPathStr = logPathSS.str();
+    logPathSS << "/home/kevin/lfast_shared/SlewDriveTestLogs/04_05_23/" << testIdStr << timeBuff << ".csv";
+    logPathStr = logPathSS.str();
     logFile.open(logPathStr.c_str(), std::ios::out);
     // print header row:
     logFile << "dt_uS,CMDA,CMDB,CURA,CURB,VELA,VELB,POSA,POSB\n";
@@ -524,4 +524,5 @@ void SlewDriveTest::shutdown()
     }
 
     std::cout << VT100::CURSOR_TO_ROW_COL(50, 0);
+    std::cout << logPathStr;
 }

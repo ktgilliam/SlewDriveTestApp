@@ -1,7 +1,7 @@
 #include "KincoDriver.h"
 #include <thread>
 #include <vector>
-
+#include <string>
 // enum
 // {
 //     SINUSOID_TEST,
@@ -73,6 +73,7 @@ private:
     SinTestParams *sinTestParamsPtr;
     FrictionTestParams *frictionTestParamsPtr;
     RampTestParams *rampTestParamsPtr;
+    std::string logPathStr;
 
     KincoDriver *pDriveA;
     KincoDriver *pDriveB;
