@@ -158,6 +158,8 @@ namespace KINCO
     };
 
     const uint32_t COUNTS_PER_REV = 10000;
-    constexpr double MOTOR_MAX_SPEED_RPM = 3500;
+    constexpr double MOTOR_MAX_SPEED_RPM = 3000; // Note: This is actually the max speed of the motor's built in encoder
     constexpr double MOTOR_MAX_SPEED_DPS = MOTOR_MAX_SPEED_RPM * 6; // 1 RPM = 6deg/s
+    const double RATED_TORQUE_NM = 1.27;
+    const double PEAK_TORQUE_NM = RATED_TORQUE_NM*3.0;
 }

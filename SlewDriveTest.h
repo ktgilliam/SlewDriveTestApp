@@ -15,6 +15,10 @@
 //     VELOCITY_MODE,
 //     // MIXED_MODE
 // };
+struct TestParams
+{
+    unsigned stop_count;
+};
 struct SinTestParams
 {
     SinTestParams(double _amplitude, double _prd_sec, unsigned _num_prds, unsigned _F_s, uint8_t _mode)
@@ -52,16 +56,16 @@ struct FrictionTestParams
 
 struct RampTestParams
 {
-    RampTestParams(double _max_speed, double _ramp_duration, double _hold_duration, unsigned _F_s)
-        : max_speed(_max_speed), ramp_duration(_ramp_duration), hold_duration(_hold_duration), F_s(_F_s) { }
-    double max_speed;
+    RampTestParams(double _test_ampl, double _ramp_duration, double _hold_duration, unsigned _F_s)
+        : test_ampl(_test_ampl), ramp_duration(_ramp_duration), hold_duration(_hold_duration), F_s(_F_s) { }
+    double test_ampl;
     unsigned F_s;
     double ramp_duration;
     double hold_duration;
     unsigned ramp_step_counts;
     unsigned hold_step_counts;
     long unsigned stop_count;
-    std::vector<double> testSpeeds;
+    std::vector<double> testCommand;
 };
 
 class SlewDriveTest

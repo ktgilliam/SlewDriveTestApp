@@ -12,6 +12,8 @@ std::ofstream logFile;
 int drvAID = DRIVER_A_ID;
 int drvBID = DRIVER_B_ID;
 
+unsigned testStopCount;
+
 inline double frictionTorque(double speed_rpm)
 {
     double coulomb = std::signbit(speed_rpm) ? -1 * COULOMB_FRICTION_NM : COULOMB_FRICTION_NM;
@@ -51,6 +53,7 @@ bool SlewDriveTest::connectToDrivers(const char *devPath)
 
 bool SlewDriveTest::configureDrivers()
 {
+    #ifndef DEBUG_MODE
     try
     {
         pDriveA->setDriverState(KINCO::POWER_OFF_MOTOR);
@@ -80,6 +83,10 @@ bool SlewDriveTest::configureDrivers()
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
+    #else
+    collectFeedbackData();
+    terminal->addDebugMessage("Leaving configureDrivers()", TERM::WARNING);
+    #endif
     return true;
 }
 
@@ -89,6 +96,7 @@ void SlewDriveTest::configureTest(SinTestParams *const paramsPtr)
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
     sinTestParamsPtr = paramsPtr;
+    testStopCount = sinTestParamsPtr->stop_count;
     // stopCount = sinTestParamsPtr->num_prds * sinTestParamsPtr->prd_sec * sinTestParamsPtr->F_s;
 
 #if OP_MODE == TORQUE_SIN_TEST_MODE
@@ -137,15 +145,17 @@ void SlewDriveTest::configureTest(FrictionTestParams *const paramsPtr)
     if (paramsPtr == nullptr)
         throw std::runtime_error("configureTest:: nullptr");
     frictionTestParamsPtr = paramsPtr;
-
     int numSteps = (4 * frictionTestParamsPtr->steps_per_side);
     frictionTestParamsPtr->counts_per_step = frictionTestParamsPtr->step_duration * frictionTestParamsPtr->F_s;
     frictionTestParamsPtr->stop_count = (unsigned)(numSteps * frictionTestParamsPtr->counts_per_step);
+    testStopCount = frictionTestParamsPtr->stop_count;
 
     try
     {
         pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
         pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
+        pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
+        pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
     }
     catch (const std::exception &e)
     {
@@ -193,67 +203,84 @@ void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
     rampTestParamsPtr = paramsPtr;
     rampTestParamsPtr->ramp_step_counts = rampTestParamsPtr->ramp_duration * rampTestParamsPtr->F_s;
     rampTestParamsPtr->hold_step_counts = rampTestParamsPtr->hold_duration * rampTestParamsPtr->F_s;
-    rampTestParamsPtr->stop_count = 2 * (2 * rampTestParamsPtr->ramp_step_counts + rampTestParamsPtr->hold_step_counts);
-    rampTestParamsPtr->testSpeeds.reserve(rampTestParamsPtr->stop_count);
-
+    rampTestParamsPtr->stop_count = (2 * rampTestParamsPtr->ramp_step_counts) + rampTestParamsPtr->hold_step_counts;
+#if BOTH_DIRECTIONS
+    rampTestParamsPtr->stop_count = 2 * rampTestParamsPtr->stop_count;
+#else
+#endif
+    testStopCount = rampTestParamsPtr->stop_count;
+    rampTestParamsPtr->testCommand.reserve(rampTestParamsPtr->stop_count);
+#ifndef DEBUG_MODE
     try
     {
+
+#if MOTOR_A_MODE == MOTOR_VELOCITY_MODE
         pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
+#elif MOTOR_A_MODE == MOTOR_TORQUE_MODE
+        pDriveA->setControlMode(KINCO::MOTOR_MODE_TORQUE);
+#else
+#error INVALID MOTOR A CONFIGURATION
+#endif
+
 #if MOTOR_B_MODE == MOTOR_VELOCITY_MODE
         pDriveB->setControlMode(KINCO::MOTOR_MODE_SPEED);
 #elif MOTOR_B_MODE == MOTOR_TORQUE_MODE
         pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
 #else
-#error INVALID MOTOR CONFIGURATION
+#error INVALID MOTOR B CONFIGURATION
 #endif
-        // pDriveA->setControlMode(KINCO::MOTOR_MODE_SPEED);
-        // pDriveB->setControlMode(KINCO::MOTOR_MODE_TORQUE);
     }
     catch (const std::exception &e)
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
+#endif
 
-    double ramp_dv = rampTestParamsPtr->max_speed / rampTestParamsPtr->ramp_step_counts;
-    double curRampSpeed = 0.0;
+    double ramp_dv = rampTestParamsPtr->test_ampl / rampTestParamsPtr->ramp_step_counts;
+    double command = 0.0;
 #if BOTH_DIRECTIONS
+    // Ramp up (0 to max)
     for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
-        curRampSpeed += ramp_dv;
+        rampTestParamsPtr->testCommand.push_back(command);
+        command += ramp_dv;
     }
+    // Hold
     for (int ii = 0; ii < rampTestParamsPtr->hold_step_counts; ii++)
     {
-        rampTestParamsPtr->testSpeeds.push_back(rampTestParamsPtr->max_speed);
+        rampTestParamsPtr->testCommand.push_back(rampTestParamsPtr->test_ampl);
     }
-    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts * 2; ii++)
+    // Ramp down (max to -max)
+    for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts*2; ii++)
     {
-        curRampSpeed -= ramp_dv;
-        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        command -= ramp_dv;
+        rampTestParamsPtr->testCommand.push_back(command);
     }
+    // Hold
     for (int ii = 0; ii < rampTestParamsPtr->hold_step_counts; ii++)
     {
-        rampTestParamsPtr->testSpeeds.push_back(rampTestParamsPtr->max_speed * -1);
+        rampTestParamsPtr->testCommand.push_back(rampTestParamsPtr->test_ampl * -1);
     }
+    // Ramp back to zero
     for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
-        curRampSpeed += ramp_dv;
+        rampTestParamsPtr->testCommand.push_back(command);
+        command += ramp_dv;
     }
 #else
     for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
-        curRampSpeed += ramp_dv;
+        rampTestParamsPtr->testCommand.push_back(command);
+        command += ramp_dv;
     }
     for (int ii = 0; ii < rampTestParamsPtr->hold_step_counts; ii++)
     {
-        rampTestParamsPtr->testSpeeds.push_back(rampTestParamsPtr->max_speed);
+        rampTestParamsPtr->testCommand.push_back(rampTestParamsPtr->test_ampl);
     }
     for (int ii = 0; ii < rampTestParamsPtr->ramp_step_counts; ii++)
     {
-        curRampSpeed -= ramp_dv;
-        rampTestParamsPtr->testSpeeds.push_back(curRampSpeed);
+        command -= ramp_dv;
+        rampTestParamsPtr->testCommand.push_back(command);
     }
 #endif
 }
@@ -261,6 +288,12 @@ void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
 
 void SlewDriveTest::updateCommands()
 {
+    collectFeedbackData();
+    if (testCounter >= testStopCount)
+    {
+        testIsDone = true;
+        return;
+    }
 #if OP_MODE == VELOCITY_SIN_TEST_MODE || OP_MODE == TORQUE_SIN_TEST_MODE
     updateSinCommands();
 #elif OP_MODE == FRICTION_TEST_MODE
@@ -273,12 +306,6 @@ void SlewDriveTest::updateCommands()
 #if OP_MODE == TORQUE_SIN_TEST_MODE || OP_MODE == VELOCITY_SIN_TEST_MODE
 void SlewDriveTest::updateSinCommands()
 {
-    collectFeedbackData();
-    if (testCounter >= sinTestParamsPtr->stop_count)
-    {
-        testIsDone = true;
-        return;
-    }
     double N = (double)testCounter;
     double T_s = 1.0 / sinTestParamsPtr->F_s;
     double f_0 = 1 / (double)sinTestParamsPtr->prd_sec;
@@ -318,18 +345,8 @@ void SlewDriveTest::updateSinCommands()
 
 #if MOTOR_B_MODE == MOTOR_TORQUE_MODE
         double trqCmd = frictionTorque(motorACommand) * 0.5;
-        pDriveB->updateTorqueCommand(trqCmd);
-#elif MOTOR_B_MODE == MOTOR_VELOCITY_MODE
-        motorBCommand = motorACommand;
-        pDriveB->updateVelocityCommand(motorBCommand);
-#endif
-    }
-    catch (const std::exception &e)
-    {
-        terminal->addDebugMessage(e.what(), TERM::WARNING);
-    }
-#elif OP_MODE == VELOCITY_SIN_TEST_MODE
-
+        pDriveB->updateTorqueCommand(trqCmd);#include <chrono>
+#include <ctime>   
     try
     {
         pDriveA->updateVelocityCommand(motorACommand);
@@ -353,20 +370,15 @@ void SlewDriveTest::updateSinCommands()
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
 #endif
+#endif
     testCounter++;
 }
+
 #endif
 
 #if OP_MODE == FRICTION_TEST_MODE
 void SlewDriveTest::updateFrictionCommands()
 {
-    collectFeedbackData();
-    if (testCounter >= frictionTestParamsPtr->stop_count)
-    {
-        testIsDone = true;
-        return;
-    }
-
     unsigned step_idx = testCounter / frictionTestParamsPtr->counts_per_step;
     motorACommand = frictionTestParamsPtr->testSpeeds.at(step_idx);
     motorBCommand = motorACommand;
@@ -395,19 +407,17 @@ void SlewDriveTest::updateFrictionCommands()
 #if OP_MODE == RAMP_TEST_MODE
 void SlewDriveTest::updateRampTestCommands()
 {
-    collectFeedbackData();
-    if (testCounter >= rampTestParamsPtr->stop_count)
-    {
-        testIsDone = true;
-        return;
-    }
-    // if(testCounter <= rampTestParamsPtr->testSpeeds.size())
-    motorACommand = rampTestParamsPtr->testSpeeds.at(testCounter);
-    // else
-    // return;
+    // if(testCounter <= rampTestParamsPtr->testCommand.size())
+    motorACommand = rampTestParamsPtr->testCommand.at(testCounter);
+    motorBCommand = motorACommand;
+#ifndef DEBUG_MODE
     try
     {
+#if MOTOR_A_MODE == MOTOR_TORQUE_MODE
+        pDriveA->updateTorqueCommand(motorACommand);
+#elif MOTOR_A_MODE == MOTOR_VELOCITY_MODE
         pDriveA->updateVelocityCommand(motorACommand);
+#endif
     }
     catch (const std::exception &e)
     {
@@ -416,10 +426,9 @@ void SlewDriveTest::updateRampTestCommands()
     try
     {
 #if MOTOR_B_MODE == MOTOR_TORQUE_MODE
-        double trqCmd = frictionTorque(motorACommand) * 0.5;
-        pDriveB->updateTorqueCommand(trqCmd);
+        // double trqCmd = frictionTorque(motorBCommand) * 0.5;
+        pDriveB->updateTorqueCommand(motorBCommand);
 #elif MOTOR_B_MODE == MOTOR_VELOCITY_MODE
-        motorBCommand = motorACommand;
         pDriveB->updateVelocityCommand(motorBCommand);
 #endif
     }
@@ -427,6 +436,7 @@ void SlewDriveTest::updateRampTestCommands()
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
+    #endif
     testCounter++;
 }
 #endif
@@ -435,15 +445,18 @@ bool SlewDriveTest::testComplete()
 {
     return testIsDone;
 }
+
 void SlewDriveTest::setupLogFile(const char *testIdStr)
 {
     std::stringstream logPathSS;
     const auto now = std::time(NULL);
     const auto ptm = std::localtime(&now);
     char timeBuff[80];
+    char dateBuff[80];
     // Format: Mo, 15.06.2009 20:20:00
+    std::strftime(dateBuff, 32, "%Y_%m_%d", ptm);
     std::strftime(timeBuff, 32, "%Y_%m_%d_%H_%M_%OS", ptm);
-    logPathSS << "/home/kevin/lfast_shared/SlewDriveTestLogs/04_05_23/" << testIdStr << timeBuff << ".csv";
+    logPathSS << "/home/kevin/lfast_shared/SlewDriveTestLogs/"  << dateBuff << "/" << testIdStr << timeBuff << ".csv";
     logPathStr = logPathSS.str();
     logFile.open(logPathStr.c_str(), std::ios::out);
     // print header row:
@@ -463,12 +476,23 @@ void SlewDriveTest::collectFeedbackData()
     logFile << motorACommand << "," << motorBCommand << ",";
     try
     {
+        #ifndef DEBUG_MODE
         logFile << pDriveA->getCurrentFeedback(updateConsole) << ",";
         logFile << pDriveB->getCurrentFeedback(updateConsole) << ",";
         logFile << pDriveA->getVelocityFeedback(updateConsole) << ",";
         logFile << pDriveB->getVelocityFeedback(updateConsole) << ",";
         logFile << pDriveA->getPositionFeedback(updateConsole) << ",";
         logFile << pDriveB->getPositionFeedback(updateConsole) << "\n";
+        #else
+        logFile  << "-1,-1,-1,-1,-1\n";
+        static uint64_t cnt = 0;
+        if (cnt++ %CONSOLE_DOWNSAMPLE == 0)
+        {
+            char msgBuff[40];
+            sprintf(msgBuff, "Time = %4.2f", double(cnt)*UPDATE_PERIOD_SEC);
+            terminal->addDebugMessage(msgBuff);
+        }
+        #endif
     }
     catch (const std::exception &e)
     {
@@ -497,10 +521,10 @@ void SlewDriveTest::logDeltaTime()
 void SlewDriveTest::setupTerminal(TerminalInterface *_terminal)
 {
     this->terminal = _terminal;
-
+#ifndef DEBUG_MODE
     pDriveA->connectTerminalInterface(terminal);
     pDriveB->connectTerminalInterface(terminal);
-
+#endif
     terminal->printHeader();
 }
 
@@ -510,6 +534,7 @@ void SlewDriveTest::shutdown()
 
     try
     {
+        #ifndef DEBUG_MODE
         pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
         pDriveB->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
 
@@ -517,6 +542,7 @@ void SlewDriveTest::shutdown()
         pDriveA->setDriverState(KINCO::POWER_OFF_MOTOR);
         pDriveB->updateVelocityCommand(0);
         pDriveB->setDriverState(KINCO::POWER_OFF_MOTOR);
+        #endif
     }
     catch (const std::exception &e)
     {
