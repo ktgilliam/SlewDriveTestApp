@@ -335,15 +335,17 @@ void SlewDriveTest::updateSinCommands()
     try
     {
         pDriveA->updateVelocityCommand(motorACommand);
+        motorBCommand = motorACommand;
+        pDriveB->updateVelocityCommand(motorBCommand);
     }
     catch (const std::exception &e)
     {
         terminal->addDebugMessage(e.what(), TERM::WARNING);
     }
+#if MOTOR_B_MODE == MOTOR_TORQUE_MODE
     try
     {
 
-#if MOTOR_B_MODE == MOTOR_TORQUE_MODE
         double trqCmd = frictionTorque(motorACommand) * 0.5;
         pDriveB->updateTorqueCommand(trqCmd);#include <chrono>
 #include <ctime>   

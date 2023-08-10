@@ -12,7 +12,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread" )
 
 add_compile_definitions(LFAST_TERMINAL)
-add_compile_definitions(JSSG_2006_TEST_MODE)
+# add_compile_definitions(JSSG_2006_TEST_MODE)
 # add_compile_definitions(DEBUG_MODE)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/02_CMake_Modules/")

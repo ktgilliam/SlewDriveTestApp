@@ -18,7 +18,7 @@
 // #define SIN_MODE 5
 
 ////////////////// //////
-#define OP_MODE TORQUE_SIN_TEST_MODE
+#define OP_MODE RAMP_TEST_MODE
 //////////////////////////
 
 const double MAX_SPEED = KINCO::MOTOR_MAX_SPEED_RPM;
@@ -30,17 +30,17 @@ const double MAX_SPEED = KINCO::MOTOR_MAX_SPEED_RPM;
 #if OP_MODE == TORQUE_SIN_TEST_MODE
 
 #define NUM_PERIODS 4
-#define PRD_SEC     40
+#define PRD_SEC     120
 #define OP_MODE_STR "TRQ_"
-const double TEST_AMPL = 1.0;
+const double TEST_AMPL = -1.0;
 
 #elif OP_MODE == VELOCITY_SIN_TEST_MODE
 #define MOTOR_B_MODE MOTOR_VELOCITY_MODE
 // #define MOTOR_B_MODE MOTOR_TORQUE_MODE
 #define OP_MODE_STR "VEL_"
 #define NUM_PERIODS 3
-#define PRD_SEC 15
-const double SPEED_AMPLITUDE = KINCO::MOTOR_MAX_SPEED_RPM;
+#define PRD_SEC 25
+const double SPEED_AMPLITUDE = KINCO::MOTOR_MAX_SPEED_RPM/5;
 //////////// Warmup settingsconst double MAX_SPEED = KINCO::MOTOR_MAX_SPEED_RPM;
 
 
@@ -59,13 +59,13 @@ const double TEST_AMPL = MAX_SPEED;
 #ifdef JSSG_2006_TEST_MODE
 #   define OP_MODE_STR "JSSG_2006_"
 #   define BOTH_DIRECTIONS true
-#   define MOTOR_A_MODE MOTOR_TORQUE_MODE
-#   define MOTOR_B_MODE MOTOR_TORQUE_MODE
+#   define MOTOR_A_MODE MOTOR_VELOCITY_MODE
+#   define MOTOR_B_MODE MOTOR_VELOCITY_MODE
 const double RAMP_DURATION = 5.0;
 const double HOLD_DURATION = 2.0;
 const double TEST_AMPL = KINCO::PEAK_TORQUE_NM*-1.5;
 #else
-#   define BOTH_DIRECTIONS false
+#   define BOTH_DIRECTIONS true
 #   define MOTOR_A_MODE MOTOR_VELOCITY_MODE
 #   define MOTOR_B_MODE MOTOR_VELOCITY_MODE
 // #define MOTOR_B_MODE MOTOR_TORQUE_MODE
@@ -79,10 +79,10 @@ const double TEST_AMPL = MAX_SPEED;
 const double RAMP_DURATION = 5.0;
 const double HOLD_DURATION = 10.0;
 #       else
-// const double TEST_AMPL = SIDEREAL_RATE_MTR_RPM*-1;
-const double TEST_AMPL = -150;
+const double TEST_AMPL = -SIDEREAL_RATE_MTR_RPM;
+// const double TEST_AMPL = MAX_SPEED/2;
 const double RAMP_DURATION = 5.0;
-const double HOLD_DURATION = 1200.0;
+const double HOLD_DURATION = 150.0;
 #       endif
 #   endif
 
@@ -99,7 +99,7 @@ const double VISCOUS_FRICTION_NM_PER_RPM = 0.0006314798000193;
 #define AZIMUTH_AXIS 0
 #define ELEVATION_AXIS 1
 
-#define ACTIVE_AXIS AZIMUTH_AXIS
+#define ACTIVE_AXIS ELEVATION_AXIS
 
 
 #if ACTIVE_AXIS == AZIMUTH_AXIS

@@ -29,6 +29,8 @@ int main()
     testObj->setupTerminal(terminal);
     #ifndef DEBUG_MODE
     bool connected = testObj->connectToDrivers(driverSerialPath);
+    if (!connected)
+        std::cout << "Error!!!!!!!!!!!!!!!!!!!!!!!!";
     // connected = true;
     testObj->configureDrivers();
     #else
