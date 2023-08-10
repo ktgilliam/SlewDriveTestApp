@@ -37,3 +37,6 @@ const double MAX_SPEED = KINCO::MOTOR_MAX_SPEED_RPM;
 
 const bool TERMINAL_DRIVE_A = true;
 const bool TERMINAL_DRIVE_B = true;
+
+#define DRIVER_A_ID 1
+#define DRIVER_B_ID 2
