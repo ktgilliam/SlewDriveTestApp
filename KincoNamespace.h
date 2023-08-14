@@ -122,7 +122,53 @@ namespace KINCO
         uint16_t ALL;
     } StatusWord_t;
 
+    struct ERROR_BITS
+    {
+        uint16_t EXTENDED : 1;            // bit 0
+        uint16_t ENCODER_ABZ_NOCONNECT : 1;           // bit 1
+        uint16_t ENCODER_UVW_INTERNAL : 1;    // bit 2
+        uint16_t ENCODER_COUNT_CRC : 1;               // bit 3
+        uint16_t DRIVE_TEMP : 1;      // bit 4
+        uint16_t OVER_VOLTAGE : 1;          // bit 5
+        uint16_t UNDER_VOLTAGE : 1;     // bit 6
+        uint16_t OVER_CURRENT : 1;         // bit 7
+        uint16_t CHOP_RESISTOR : 1;        // bit 8
+        uint16_t POSITION_FOLLOWING : 1;              // bit 9
+        uint16_t LOW_LOGIC_VOLTAGE : 1;      // bit 10
+        uint16_t MOTOR_DRIVER_IIT : 1;      // bit 11
+        uint16_t OVER_FREQUENCY : 1;        // bit 12
+        uint16_t MOTOR_TEMP : 1;     // bit 13
+        uint16_t MOTOR_COMMS : 1; // bit 14
+        uint16_t EEPROM_DATA : 1;     // bit 15
+    };
 
+    typedef union
+    {
+        struct ERROR_BITS BITS;
+        uint16_t ALL;
+    } ErrorWord_t;
+    
+
+
+    //    struct EXTENDED_ERROR_BITS
+    // {
+    //     uint16_t CURRENT_SENSOR : 1;            // bit 0
+    //     uint16_t WATCHDOG : 1;           // bit 1
+    //     uint16_t WRONG_INTERRUPT : 1;    // bit 2
+    //     uint16_t MCU_ID : 1;               // bit 3
+    //     uint16_t MOTOR_CONFIG : 1;      // bit 4
+    //     uint16_t EXT_CABLE : 1;          // bit 5
+    //     uint16_t POSITIVE_LIMIT : 1;     // bit 6
+    //     uint16_t NEGATIVE_LIMIT : 1;         // bit 7
+    //     uint16_t SPI_INTERNAL : 1;        // bit 8
+    //     uint16_t CLOSE_LOOP_DIRECTION : 1;              // bit 9
+    //     uint16_t MASTER_COUNTING : 1;      // bit 10
+    //     uint16_t UNUSED_0 : 1;      // bit 11
+    //     uint16_t UNUSED_1 : 1;        // bit 12
+    //     uint16_t UNUSED_2 : 1;     // bit 13
+    //     uint16_t UNUSED_3 : 1; // bit 14
+    //     uint16_t UNUSED_4 : 1;     // bit 15
+    // };
 //////////////////////////////////////////////////////////////////////////////////////////////////
 ///
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,8 +204,6 @@ namespace KINCO
     };
 
     const uint32_t COUNTS_PER_REV = 10000;
-    constexpr double MOTOR_MAX_SPEED_RPM = 3000; // Note: This is actually the max speed of the motor's built in encoder
+    constexpr double MOTOR_MAX_SPEED_RPM = 5000;
     constexpr double MOTOR_MAX_SPEED_DPS = MOTOR_MAX_SPEED_RPM * 6; // 1 RPM = 6deg/s
-    const double RATED_TORQUE_NM = 1.27;
-    const double PEAK_TORQUE_NM = RATED_TORQUE_NM*3.0;
 }

@@ -79,8 +79,8 @@ const double TEST_AMPL = MAX_SPEED;
 const double RAMP_DURATION = 5.0;
 const double HOLD_DURATION = 10.0;
 #       else
-const double TEST_AMPL = -SIDEREAL_RATE_MTR_RPM;
-// const double TEST_AMPL = MAX_SPEED/2;
+// const double TEST_AMPL = -SIDEREAL_RATE_MTR_RPM;
+const double TEST_AMPL = MAX_SPEED/2;
 const double RAMP_DURATION = 5.0;
 const double HOLD_DURATION = 150.0;
 #       endif

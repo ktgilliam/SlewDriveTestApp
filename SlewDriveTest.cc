@@ -58,7 +58,7 @@ bool SlewDriveTest::configureDrivers()
     {
         pDriveA->setDriverState(KINCO::POWER_OFF_MOTOR);
         pDriveB->setDriverState(KINCO::POWER_OFF_MOTOR);
-
+        
         pDriveA->setDirectionMode(KINCO::CCW_IS_POSITIVE);
         pDriveB->setDirectionMode(KINCO::CW_IS_POSITIVE);
         pDriveA->setMaxSpeed(KINCO::MOTOR_MAX_SPEED_RPM);
@@ -289,18 +289,24 @@ void SlewDriveTest::configureTest(RampTestParams *const paramsPtr)
 void SlewDriveTest::updateCommands()
 {
     collectFeedbackData();
+    pDriveA->checkIfDriverIsReady();
+    pDriveB->checkIfDriverIsReady();
+    bool check = KincoDriver::drivesEnabled();
     if (testCounter >= testStopCount)
-    {
         testIsDone = true;
-        return;
-    }
+    if (check != true)
+        testIsDone = true;
+
+    if (!testIsDone)
+    {
 #if OP_MODE == VELOCITY_SIN_TEST_MODE || OP_MODE == TORQUE_SIN_TEST_MODE
-    updateSinCommands();
+        updateSinCommands();
 #elif OP_MODE == FRICTION_TEST_MODE
-    updateFrictionCommands();
+        updateFrictionCommands();
 #elif OP_MODE == RAMP_TEST_MODE
-    updateRampTestCommands();
+        updateRampTestCommands();
 #endif
+    }
 }
 
 #if OP_MODE == TORQUE_SIN_TEST_MODE || OP_MODE == VELOCITY_SIN_TEST_MODE

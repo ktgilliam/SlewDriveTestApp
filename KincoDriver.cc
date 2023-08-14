@@ -3,16 +3,18 @@
 #include <cinttypes>
 #include <string>
 #include <stdexcept>
+#include <sstream> // std::stringstream
 
-#include "config.h"
 #include "KincoNamespace.h"
 #include "BitFieldUtil.h"
 #include "math_util.h"
+#include "config.h"
 
-#define ERR_BUFF_SIZE 60
+#define ERR_BUFF_SIZE 80
 
 modbus_t *KincoDriver::ctx;
 std::vector<KincoDriver *> KincoDriver::connectedDrives;
+bool KincoDriver::drivesDisabled;
 
 double convertPosnIUtoDeg(int32_t current_units);
 double convertSpeedIUtoRPM(int32_t speed_units);
@@ -29,6 +31,7 @@ KincoDriver::KincoDriver(int16_t driverId)
     modbusNodeIsSet = false;
     DriveIsConnected = false;
     encoderOffset = 0;
+    KincoDriver::drivesDisabled = false;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,9 +71,8 @@ bool KincoDriver::driverHandshake()
     }
 
     modbus_flush(ctx);
-    KINCO::StatusWord_t driveStatus;
-    driveStatus.ALL = readDriverRegister<uint16_t>(driverNodeId, KINCO::STATUS_WORD);
-    bool commsFound = driveStatus.BITS.COMMUNICATION_FOUND;
+    readDriverStatus(false);
+    bool commsFound = kincoStatusData.BITS.COMMUNICATION_FOUND;
     if (commsFound)
     {
         DriveIsConnected = true;
@@ -164,7 +166,9 @@ void KincoDriver::setDriverState(uint16_t motor_state)
 {
     if (!DriveIsConnected)
         throw std::runtime_error("setDriverState: Driver connection not established (call driverHandshake() first).");
-    writeDriverRegisters<uint16_t>(driverNodeId, KINCO::CONTROL_WORD, motor_state);
+    checkForDriveErrors();
+    if (!KincoDriver::drivesDisabled)
+        writeDriverRegisters<uint16_t>(driverNodeId, KINCO::CONTROL_WORD, motor_state);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,7 +178,11 @@ void KincoDriver::setControlMode(uint16_t motor_mode)
 {
     if (!DriveIsConnected)
         throw std::runtime_error("setControlMode: Driver connection not established (call driverHandshake() first).");
-    writeDriverRegisters<uint16_t>(driverNodeId, KINCO::OPERATION_MODE, motor_mode);
+    // checkForDriveErrors();
+    checkIfDriverIsReady();
+    if (!KincoDriver::drivesDisabled)
+        writeDriverRegisters<uint16_t>(driverNodeId, KINCO::OPERATION_MODE, motor_mode);
+    checkIfDriverIsReady();
 #if defined(LFAST_TERMINAL)
     if (cli != nullptr)
     {
@@ -198,9 +206,214 @@ void KincoDriver::setControlMode(uint16_t motor_mode)
             break;
         }
     }
+    checkIfDriverIsReady();
 #endif
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////
+///
+//////////////////////////////////////////////////////////////////////////////////////////////////
+void KincoDriver::readDriverStatus(bool checkForHandshake)
+{
+    if (checkForHandshake)
+    {
+        if (!DriveIsConnected)
+            throw std::runtime_error("readDriverStatus: Driver connection not established (call driverHandshake() first).");
+    }
+    kincoStatusData.ALL = readDriverRegister<int16_t>(driverNodeId, KINCO::STATUS_WORD);
+}
+void KincoDriver::checkIfDriverIsReady()
+{
+    bool problem = checkForDriveErrors();
+    if (!problem)
+    {
+        readDriverStatus();
+        // if (kincoStatusData.BITS.SWITCH_ON == 1)
+        // {
+        //     // KincoDriver::drivesDisabled = true;
+        //     // throw std::runtime_error("readDriverStatus: E-Stop pushed. Drive disabled.");   
+        // }        
+        if (kincoStatusData.BITS.FAULT == 1)
+        {
+            KincoDriver::drivesDisabled = true;
+            throw std::runtime_error("readDriverStatus: Drive reporting FAULT. Drive disabled.");   
+        }
+        if (kincoStatusData.BITS.OPERATION_ENABLE == 0)
+        {
+            // if (kincoStatusData.BITS.SWITCH_ON == 1 && kincoStatusData.BITS.SWITCH_DISABLED == 1)
+            if (kincoStatusData.BITS.SWITCH_DISABLED == 1)
+            {
+                KincoDriver::drivesDisabled = true;
+                throw std::runtime_error("readDriverStatus: E-Stop pushed. Drive disabled.");   
+            }       
+        }
+            int a = 5;
+    }
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////
+///
+//////////////////////////////////////////////////////////////////////////////////////////////////
+bool KincoDriver::checkForDriveErrors()
+{
+    KINCO::ErrorWord_t tmpErrData;
+    tmpErrData.ALL = ~(16433);
+    bool errorStatus = false;
+    if (!DriveIsConnected)
+    {
+        throw std::runtime_error("readDriverStatus: Driver connection not established (call driverHandshake() first).");
+    }
+    else
+    {
+        kincoErrorData.ALL = readDriverRegister<int16_t>(driverNodeId, KINCO::ERROR_STATE);
+        if (kincoErrorData.ALL != 0)
+        {
+            drive_error_handler();
+            errorStatus = true;
+        }
+    }
+    return errorStatus;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////
+///
+//////////////////////////////////////////////////////////////////////////////////////////////////
+void KincoDriver::drive_error_handler()
+{
+    std::stringstream ss;
+    uint16_t errCount = 0;
+    // char errString[25];
+    ss << "DRIVE ERROR(S)! [" << driverNodeId << "]: ";
+
+    if (kincoErrorData.BITS.EXTENDED == true)
+    {
+        ss << "EXTENDED_ERROR";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.ENCODER_ABZ_NOCONNECT == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "ENCODER_ABZ_NOCONNECT";
+        errCount++;
+    }
+    // if (kincoErrorData.BITS.ENCODER_UVW_INTERNAL == true)
+    // {
+    //     if (errCount > 0)
+    //         ss << ", ";
+    //     ss << "ENCODER_UVW_INTERNAL";
+    //     errCount++;
+    // }
+    if (kincoErrorData.BITS.ENCODER_COUNT_CRC == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "ENCODER_COUNT_CRC";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.DRIVE_TEMP == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "DRIVE_TEMP";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.OVER_VOLTAGE == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "OVER_VOLAGE";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.UNDER_VOLTAGE == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "UNDER_VOLTAGE";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.OVER_CURRENT == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "OVER_CURRENT";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.CHOP_RESISTOR == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "CHOP_RESISTOR";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.POSITION_FOLLOWING == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "POSITION_FOLLOWING";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.LOW_LOGIC_VOLTAGE == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "LOW_LOGIC_VOLTAGE";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.MOTOR_DRIVER_IIT == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "MOTOR_DRIVER_IIT";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.OVER_FREQUENCY == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "OVER_FREQUENCY";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.MOTOR_TEMP == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "MOTOR_TEMP";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.MOTOR_COMMS == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "MOTOR_COMMS";
+        errCount++;
+    }
+    if (kincoErrorData.BITS.EEPROM_DATA == true)
+    {
+        if (errCount > 0)
+            ss << ", ";
+        ss << "EEPROM_DATA";
+        errCount++;
+    }
+    
+    if (errCount > 0)
+    {
+        ss << ". DISABLING DRIVES. POWER CYCLE REQUIRED.";
+        drivesDisabled = true;
+        KincoDriver::disable_all();
+        throw std::runtime_error(ss.str());
+    }
+
+
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////
+///
+//////////////////////////////////////////////////////////////////////////////////////////////////
+void KincoDriver::disable_all()
+{
+    for (auto & drv : KincoDriver::connectedDrives)
+    {
+        writeDriverRegisters<uint16_t>(drv->driverNodeId, KINCO::CONTROL_WORD, KINCO::POWER_OFF_MOTOR);
+    }
+}
 //////////////////////////////////////////////////////////////////////////////////////////////////
 ///
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -229,6 +442,7 @@ void KincoDriver::zeroPositionOffset()
 {
     if (!DriveIsConnected)
         throw std::runtime_error("zeroPositionOffset: Driver connection not established (call driverHandshake() first).");
+    writeDriverRegisters<int32_t>(driverNodeId, KINCO::POS_ACTUAL, 0);
     encoderOffset = readDriverRegister<int32_t>(driverNodeId, KINCO::POS_ACTUAL);
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,8 +471,8 @@ void KincoDriver::updateVelocityCommand(double velocity_setpoint)
 {
     if (!DriveIsConnected)
         throw std::runtime_error("updateVelocityCommand: Driver connection not established (call driverHandshake() first).");
-    double vsp_saturated = velocity_setpoint;
-    // double vsp_saturated = saturate(velocity_setpoint, -1*KINCO::MOTOR_MAX_SPEED_RPM,  KINCO::MOTOR_MAX_SPEED_RPM);
+
+    double vsp_saturated = saturate(velocity_setpoint, -KINCO::MOTOR_MAX_SPEED_RPM, KINCO::MOTOR_MAX_SPEED_RPM);
     int32_t vsp_IU = convertSpeedRPMtoIU(vsp_saturated);
     writeDriverRegisters<int32_t>(driverNodeId, KINCO::TARGET_SPEED, vsp_IU);
 #if defined(LFAST_TERMINAL)
